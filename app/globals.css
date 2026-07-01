@@ -228,3 +228,125 @@ body {
   opacity: 0.4;
   pointer-events: none;
 }
+
+/* ————— علامات الأخطاء على الكلمات ————— */
+.word.marked {
+  background: var(--mark-bg);
+  box-shadow: inset 0 -0.13em 0 0 var(--mark-color);
+}
+
+.word.marked:hover {
+  filter: brightness(0.94);
+}
+
+/* ————— شريط الجلسة ————— */
+.session-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.session-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green-deep);
+}
+
+.session-bar input[type='date'] {
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.legend {
+  display: inline-flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.legend-chip {
+  border: 1.5px solid;
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 11.5px;
+}
+
+.error-count {
+  color: var(--green-deep);
+  opacity: 0.85;
+}
+
+/* ————— نافذة اختيار نوع الخطأ ————— */
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.error-popover {
+  position: absolute;
+  z-index: 50;
+  width: 210px;
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(33, 48, 31, 0.25);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popover-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--green-deep);
+  text-align: center;
+}
+
+.error-popover .types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.type-btn {
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 7px 6px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 100ms ease;
+}
+
+.type-btn:hover {
+  transform: scale(1.04);
+}
+
+.type-btn.active {
+  border-color: currentColor;
+}
+
+.remove-btn {
+  border-radius: 10px;
+  padding: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8b2f22;
+  background: rgba(192, 57, 43, 0.08);
+  cursor: pointer;
+}
+
+.remove-btn:hover {
+  background: rgba(192, 57, 43, 0.16);
+}

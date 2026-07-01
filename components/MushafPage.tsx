@@ -1,5 +1,6 @@
 'use client';
 
+import { ERROR_TYPES, type ErrorMark } from '@/lib/errors';
 import {
   BASMALA,
   buildLines,
@@ -8,14 +9,16 @@ import {
   type Chapter,
   type PageData,
 } from '@/lib/quran';
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 
 type Props = {
   data: PageData;
   chapters: Map<number, Chapter>;
+  marks?: Map<string, ErrorMark[]>;
+  onWordClick?: (wordId: string, el: HTMLElement) => void;
 };
 
-export default function MushafPage({ data, chapters }: Props) {
+export default function MushafPage({ data, chapters, marks, onWordClick }: Props) {
   const lines = useMemo(() => buildLines(data), [data]);
   const ornate = data.page <= 2; // الفاتحة وبداية البقرة بتنسيق مزخرف مُوسَّط
   const firstChapter = data.verses[0]?.chapter;
@@ -54,17 +57,32 @@ export default function MushafPage({ data, chapters }: Props) {
               const centered = ornate || slot.words.length < 4;
               return (
                 <div key={i} className={`mushaf-line ${centered ? 'centered' : ''}`}>
-                  {slot.words.map((w) =>
-                    w.type === 'end' ? (
-                      <span key={w.id} className="ayah-end">
-                        {'۝' + toArabicDigits(w.text)}
-                      </span>
-                    ) : (
-                      <span key={w.id} className="word" data-word-id={w.id}>
+                  {slot.words.map((w) => {
+                    if (w.type === 'end') {
+                      return (
+                        <span key={w.id} className="ayah-end">
+                          {'۝' + toArabicDigits(w.text)}
+                        </span>
+                      );
+                    }
+                    const wordMarks = marks?.get(w.id);
+                    const last = wordMarks?.[wordMarks.length - 1];
+                    const t = last ? ERROR_TYPES[last.type] : null;
+                    return (
+                      <span
+                        key={w.id}
+                        className={`word ${t ? 'marked' : ''}`}
+                        style={
+                          t
+                            ? ({ '--mark-color': t.color, '--mark-bg': t.bg } as CSSProperties)
+                            : undefined
+                        }
+                        onClick={(e) => onWordClick?.(w.id, e.currentTarget)}
+                      >
                         {w.text}
                       </span>
-                    )
-                  )}
+                    );
+                  })}
                 </div>
               );
             })}
