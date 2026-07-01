@@ -71,6 +71,35 @@ export function removeWordMarks(marks: ErrorMark[], wordId: string, date?: strin
   return marks.filter((m) => !(m.wordId === wordId && (date === undefined || m.date === date)));
 }
 
+// ملخّص الطبقات: كل تاريخ جلسة وعدد كلماته (الأحدث أولاً)
+export function datesSummary(marks: ErrorMark[]): { date: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const m of marks) counts.set(m.date, (counts.get(m.date) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// عدد + اسم معدود بصيغة عربية سليمة
+export function arabicWordCount(n: number): string {
+  const digits = (x: number) => String(x).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]);
+  if (n === 0) return 'بلا كلمات';
+  if (n === 1) return 'كلمة واحدة';
+  if (n === 2) return 'كلمتان';
+  if (n <= 10) return `${digits(n)} كلمات`;
+  return `${digits(n)} كلمة`;
+}
+
+// تاريخ ميلادي بأرقام عربية (نفس أسلوب بقية التطبيقات)
+export function formatArabicDate(iso: string): string {
+  return new Intl.DateTimeFormat('ar-u-ca-gregory-nu-arab', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(iso + 'T00:00:00'));
+}
+
 // خريطة كلمة → علاماتها (مرتبة زمنياً) لصفحة معيّنة
 export function marksByWord(marks: ErrorMark[], page: number): Map<string, ErrorMark[]> {
   const map = new Map<string, ErrorMark[]>();

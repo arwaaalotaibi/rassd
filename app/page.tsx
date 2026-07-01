@@ -3,6 +3,9 @@
 import MushafPage from '@/components/MushafPage';
 import {
   ERROR_TYPES,
+  arabicWordCount,
+  datesSummary,
+  formatArabicDate,
   loadMarks,
   marksByWord,
   removeWordMarks,
@@ -41,6 +44,8 @@ export default function Home() {
   const [marks, setMarks] = useState<ErrorMark[]>([]);
   const [sessionDate, setSessionDate] = useState(todayISO());
   const [popover, setPopover] = useState<Popover | null>(null);
+  const [hiddenDates, setHiddenDates] = useState<Set<string>>(new Set());
+  const [layersOpen, setLayersOpen] = useState(false);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
 
@@ -49,18 +54,43 @@ export default function Home() {
     [chapters]
   );
 
-  const pageMarks = useMemo(() => marksByWord(marks, page), [marks, page]);
+  // الطبقات: العلامات المعروضة = تواريخ غير مخفيّة فقط
+  const layers = useMemo(() => datesSummary(marks), [marks]);
+  const visibleMarks = useMemo(
+    () => marks.filter((m) => !hiddenDates.has(m.date)),
+    [marks, hiddenDates]
+  );
+  const pageMarks = useMemo(() => marksByWord(visibleMarks, page), [visibleMarks, page]);
   const pageErrorCount = useMemo(() => pageMarks.size, [pageMarks]);
 
-  // استرجاع آخر صفحة + العلامات + تحميل أسماء السور
+  // استرجاع آخر صفحة + العلامات + الطبقات المخفية + تحميل أسماء السور
   useEffect(() => {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
     setMarks(loadMarks());
+    try {
+      const hidden = JSON.parse(localStorage.getItem('rassd:hiddenDates') ?? '[]');
+      if (Array.isArray(hidden)) setHiddenDates(new Set(hidden));
+    } catch {}
     fetch('/quran/chapters.json')
       .then((r) => r.json())
       .then(setChapters);
   }, []);
+
+  const updateHiddenDates = useCallback((next: Set<string>) => {
+    setHiddenDates(next);
+    localStorage.setItem('rassd:hiddenDates', JSON.stringify([...next]));
+  }, []);
+
+  const toggleLayer = useCallback(
+    (date: string) => {
+      const next = new Set(hiddenDates);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      updateHiddenDates(next);
+    },
+    [hiddenDates, updateHiddenDates]
+  );
 
   // تحميل الصفحة الحالية + جلب مسبق للمجاورتين
   useEffect(() => {
@@ -195,6 +225,58 @@ export default function Home() {
         </span>
       </div>
 
+      {/* لوحة الطبقات — كل تاريخ جلسة طبقة مستقلة */}
+      <div className="layers-panel w-full max-w-xl">
+        <button className="layers-header" onClick={() => setLayersOpen(!layersOpen)}>
+          <span>
+            🎚️ طبقات التواريخ{' '}
+            {layers.length > 0 && (
+              <span className="layers-count">{toArabicDigits(layers.length)}</span>
+            )}
+          </span>
+          <span className="layers-chevron">{layersOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {layersOpen && (
+          <div className="layers-body">
+            {layers.length === 0 ? (
+              <p className="layers-empty">
+                لا توجد طبقات بعد — ارصدي أول خطأ وستظهر جلسة اليوم هنا كطبقة.
+              </p>
+            ) : (
+              <>
+                <div className="layers-actions">
+                  <button onClick={() => updateHiddenDates(new Set())}>👁 إظهار الكل</button>
+                  <button
+                    onClick={() => updateHiddenDates(new Set(layers.map((l) => l.date)))}
+                  >
+                    🚫 إخفاء الكل
+                  </button>
+                </div>
+                {layers.map((l) => {
+                  const hidden = hiddenDates.has(l.date);
+                  return (
+                    <button
+                      key={l.date}
+                      className={`layer-row ${hidden ? 'hidden-layer' : ''}`}
+                      onClick={() => toggleLayer(l.date)}
+                      title={hidden ? 'إظهار الطبقة' : 'إخفاء الطبقة'}
+                    >
+                      <span className="layer-eye">{hidden ? '◡' : '👁'}</span>
+                      <span className="layer-date">
+                        {formatArabicDate(l.date)}
+                        {l.date === sessionDate && <em> — الجلسة الحالية</em>}
+                      </span>
+                      <span className="layer-count">{arabicWordCount(l.count)}</span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* صفحة المصحف */}
       <div className="w-full max-w-xl relative" ref={pageWrapRef}>
         {data && chapters.length > 0 ? (
@@ -233,6 +315,12 @@ export default function Home() {
                     style={{ background: ERROR_TYPES[k].bg, color: ERROR_TYPES[k].color }}
                     onClick={() => {
                       updateMarks(upsertMark(marks, popover.wordId, page, k, sessionDate));
+                      // رصد على طبقة مخفيّة يُظهرها تلقائياً حتى لا يختفي الرصد الجديد
+                      if (hiddenDates.has(sessionDate)) {
+                        const next = new Set(hiddenDates);
+                        next.delete(sessionDate);
+                        updateHiddenDates(next);
+                      }
                       setPopover(null);
                     }}
                   >
