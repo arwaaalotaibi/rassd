@@ -51,6 +51,7 @@ export default function Home() {
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
   const [exportErr, setExportErr] = useState('');
+  const [exportBusy, setExportBusy] = useState('');
   const [printData, setPrintData] = useState<PageData[] | null>(null);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
@@ -147,6 +148,8 @@ export default function Home() {
   const normalizeDigits = (s: string) =>
     s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 
+  // توليد PDF حقيقي داخل المتصفح (يعمل على الجوال أيضاً حيث window.print معطّلة):
+  // نرسم صفحات النطاق خارج الشاشة → نصوّر كل صفحة canvas → نجمعها في ملف PDF وينزل مباشرة
   const doExport = async () => {
     const from = exportFrom ? Number(normalizeDigits(exportFrom)) : page;
     const to = exportTo ? Number(normalizeDigits(exportTo)) : from;
@@ -163,32 +166,60 @@ export default function Home() {
       return;
     }
     setExportErr('');
-    const nums = Array.from({ length: to - from + 1 }, (_, i) => from + i);
-    const datas = await Promise.all(nums.map(fetchPage));
-    setExportOpen(false);
-    setPrintData(datas);
-  };
+    setExportBusy('يجهّز الصفحات…');
+    try {
+      const nums = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+      const datas = await Promise.all(nums.map(fetchPage));
+      setPrintData(datas);
+      await document.fonts.ready;
+      // ننتظر حتى تُرسم كل الصفحات خارج الشاشة
+      for (let tries = 0; tries < 60; tries++) {
+        if (document.querySelectorAll('.print-page').length >= nums.length) break;
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      await new Promise((r) => setTimeout(r, 150));
 
-  useEffect(() => {
-    if (!printData) return;
-    let cancelled = false;
-    // ننتظر تحميل خط المصحف واكتمال الرسم قبل فتح الطباعة حتى لا تخرج الصفحات فارغة أو بخط بديل
-    document.fonts.ready.then(() => {
-      if (cancelled) return;
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() =>
-          setTimeout(() => {
-            if (cancelled) return;
-            window.print();
-            setPrintData(null);
-          }, 120)
-        )
-      );
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [printData]);
+      const [{ toCanvas }, { jsPDF }] = await Promise.all([
+        import('html-to-image'),
+        import('jspdf'),
+      ]);
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>('.print-page'));
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+      const MARGIN = 8;
+      for (let i = 0; i < nodes.length; i++) {
+        setExportBusy(`يصوّر صفحة ${toArabicDigits(nums[i])} (${toArabicDigits(i + 1)}/${toArabicDigits(nodes.length)})…`);
+        const canvas = await toCanvas(nodes[i], {
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+        });
+        const ratio = canvas.width / canvas.height;
+        const maxW = 210 - MARGIN * 2;
+        const maxH = 297 - MARGIN * 2;
+        let h = maxH;
+        let w = h * ratio;
+        if (w > maxW) {
+          w = maxW;
+          h = w / ratio;
+        }
+        if (i > 0) pdf.addPage();
+        pdf.addImage(
+          canvas.toDataURL('image/jpeg', 0.92),
+          'JPEG',
+          (210 - w) / 2,
+          (297 - h) / 2,
+          w,
+          h
+        );
+      }
+      pdf.save(`rassd-${from}${to !== from ? `-${to}` : ''}.pdf`);
+      setExportOpen(false);
+    } catch {
+      setExportErr('تعذّر إنشاء الملف — جرّبي مرة أخرى أو قلّلي عدد الصفحات');
+    } finally {
+      setExportBusy('');
+      setPrintData(null);
+    }
+  };
 
   const currentChapter = data?.verses[0]?.chapter ?? 1;
   const popoverMarks = popover ? pageMarks.get(popover.wordId) ?? [] : [];
@@ -446,10 +477,14 @@ export default function Home() {
             </div>
             {exportErr && <p className="export-error">⚠️ {exportErr}</p>}
             <div className="export-actions">
-              <button className="nav-btn" onClick={doExport}>
-                🖨️ طباعة / حفظ PDF
+              <button className="nav-btn" onClick={doExport} disabled={!!exportBusy}>
+                {exportBusy || '⬇️ تنزيل PDF'}
               </button>
-              <button className="cancel-btn" onClick={() => setExportOpen(false)}>
+              <button
+                className="cancel-btn"
+                onClick={() => setExportOpen(false)}
+                disabled={!!exportBusy}
+              >
                 إلغاء
               </button>
             </div>

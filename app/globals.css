@@ -558,123 +558,47 @@ body {
   background: rgba(33, 48, 31, 0.13);
 }
 
-/* ————— الطباعة / PDF ————— */
+/* ————— تصدير PDF: الصفحات تُرسم خارج الشاشة بعرض ثابت ثم تُصوَّر ————— */
 .print-root {
-  display: none;
+  position: fixed;
+  top: 0;
+  inset-inline-start: -20000px;
+  width: 794px;
+  z-index: -1;
+  pointer-events: none;
 }
 
-@page {
-  size: A4;
-  margin: 8mm;
+.print-page {
+  width: 794px;
+  background: #fff;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  direction: rtl;
 }
 
-@media print {
-  * {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+.print-page .mushaf-frame {
+  box-shadow: none;
+}
 
-  body {
-    background: #fff;
-  }
+.print-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--green-deep);
+  border-bottom: 1.5px solid var(--gold-soft);
+  padding-bottom: 8px;
+}
 
-  .app-root {
-    display: none !important;
-  }
+.print-legend {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
 
-  .print-root {
-    display: block;
-  }
-
-  .print-page {
-    break-after: page;
-    width: 165mm;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 4mm;
-  }
-
-  /* استعلامات الحاوية (cqw) لا تعمل داخل الطباعة في كروم → مقاسات ثابتة بالمليمتر */
-  .print-page .mushaf-page {
-    container-type: normal;
-    padding: 7mm 6.5mm 5mm;
-  }
-
-  .print-page .page-meta {
-    font-size: 4.2mm;
-    padding: 0 1.6mm 2mm;
-    margin-bottom: 2.6mm;
-  }
-
-  .print-page .mushaf-line {
-    font-size: 7.4mm;
-  }
-
-  .print-page .basmala-line {
-    font-size: 6.8mm;
-  }
-
-  .print-page .surah-header {
-    padding: 1mm 0;
-  }
-
-  .print-page .surah-header-band {
-    gap: 3mm;
-    padding: 1mm 3mm;
-    font-size: 5.8mm;
-  }
-
-  .print-page .surah-header-band::before,
-  .print-page .surah-header-band::after {
-    font-size: 4.8mm;
-  }
-
-  .print-page .page-number {
-    padding-top: 2.3mm;
-    font-size: 4.5mm;
-  }
-
-  .print-page .mushaf-page.ornate .mushaf-lines {
-    margin: auto 6.5mm;
-    gap: 2mm;
-    padding: 6.5mm 5.5mm;
-  }
-
-  .print-page .mushaf-page.ornate .mushaf-line {
-    min-height: 14mm;
-  }
-
-  .print-page .mushaf-page.ornate .surah-header {
-    padding-bottom: 2.5mm;
-  }
-
-  .print-page:last-child {
-    break-after: auto;
-  }
-
-  .print-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--green-deep);
-    border-bottom: 1.5px solid var(--gold-soft);
-    padding-bottom: 2mm;
-  }
-
-  .print-legend {
-    display: flex;
-    gap: 6px;
-    justify-content: center;
-  }
-
-  .print-page .mushaf-frame {
-    box-shadow: none;
-  }
-
-  .word {
-    cursor: default;
-  }
+.print-legend .legend-chip {
+  font-size: 13px;
 }
