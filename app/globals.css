@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "UthmanicHafs";
+  src: url("/fonts/UthmanicHafs.woff2") format("woff2");
+  font-display: swap;
+}
+
+:root {
+  --paper: #fdfaf1;
+  --paper-deep: #f6efdd;
+  --ink: #21301f;
+  --gold: #b8912f;
+  --gold-soft: #d9c48a;
+  --green: #14614a;
+  --green-deep: #0d4534;
+  --bg: #ece5d3;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #f7f2e4 0%, transparent 60%),
+    var(--bg);
+}
+
+/* ————— إطار صفحة المصحف ————— */
+.mushaf-frame {
+  background: linear-gradient(160deg, #cfa54a, #b8912f 40%, #dcc07a 70%, #b8912f);
+  border-radius: 18px;
+  padding: 6px;
+  box-shadow:
+    0 20px 50px -18px rgba(33, 48, 31, 0.45),
+    0 4px 14px rgba(33, 48, 31, 0.15);
+}
+
+.mushaf-frame-inner {
+  background: var(--green-deep);
+  border-radius: 13px;
+  padding: 5px;
+}
+
+.mushaf-page {
+  container-type: inline-size;
+  background:
+    radial-gradient(140% 90% at 50% 0%, var(--paper) 55%, var(--paper-deep) 100%);
+  border-radius: 9px;
+  padding: 4.5cqw 4cqw 3cqw;
+  display: flex;
+  flex-direction: column;
+  direction: rtl;
+}
+
+/* شريط المعلومات أعلى الصفحة (السورة / الجزء) */
+.page-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 2.6cqw;
+  color: var(--green-deep);
+  font-weight: 700;
+  padding: 0 1cqw 1.2cqw;
+  border-bottom: 1px solid var(--gold-soft);
+  margin-bottom: 1.6cqw;
+}
+
+/* ————— أسطر المصحف ————— */
+.mushaf-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mushaf-line {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "UthmanicHafs", serif;
+  font-size: 4.55cqw;
+  line-height: 1.05;
+  color: var(--ink);
+}
+
+.mushaf-line.centered {
+  justify-content: center;
+  gap: 0.32em;
+}
+
+.mushaf-page.ornate .mushaf-lines {
+  justify-content: center;
+  gap: 0.6cqw;
+}
+
+.mushaf-page.ornate .mushaf-line {
+  flex: 0 0 auto;
+  min-height: 8.5cqw;
+}
+
+.word {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.06em 0.05em;
+  transition: background-color 120ms ease;
+}
+
+.word:hover {
+  background: rgba(184, 145, 47, 0.22);
+}
+
+/* علامة نهاية الآية */
+.ayah-end {
+  font-family: "UthmanicHafs", serif;
+  color: var(--green);
+  margin: 0 0.08em;
+}
+
+/* ————— رأس السورة ————— */
+.surah-header {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0.5cqw 0;
+}
+
+.surah-header-band {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  background: linear-gradient(90deg, transparent, rgba(20, 97, 74, 0.1) 18%, rgba(20, 97, 74, 0.16) 50%, rgba(20, 97, 74, 0.1) 82%, transparent);
+  border-block: 1.5px solid var(--gold);
+  border-radius: 8px;
+  padding: 0.6cqw 2cqw;
+  color: var(--green-deep);
+  font-weight: 800;
+  font-size: 3.6cqw;
+}
+
+.surah-header-band::before,
+.surah-header-band::after {
+  content: "❁";
+  color: var(--gold);
+  font-size: 3cqw;
+}
+
+.basmala-line {
+  justify-content: center !important;
+  font-size: 4.2cqw;
+  color: var(--ink);
+}
+
+/* رقم الصفحة أسفل */
+.page-number {
+  display: flex;
+  justify-content: center;
+  padding-top: 1.4cqw;
+  font-size: 2.8cqw;
+  font-weight: 700;
+  color: var(--green-deep);
+}
+
+.page-number span {
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 999px;
+  padding: 0.1em 1.1em;
+  background: rgba(184, 145, 47, 0.08);
+}
+
+/* ————— أدوات التحكم ————— */
+.controls select,
+.controls input {
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--ink);
+  outline: none;
+}
+
+.controls select:focus,
+.controls input:focus {
+  border-color: var(--gold);
+}
+
+.nav-btn {
+  background: var(--green);
+  color: #fdfaf1;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-weight: 700;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.nav-btn:hover {
+  background: var(--green-deep);
+}
+
+.nav-btn:active {
+  transform: scale(0.96);
+}
+
+.nav-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
