@@ -46,6 +46,11 @@ export default function Home() {
   const [popover, setPopover] = useState<Popover | null>(null);
   const [hiddenDates, setHiddenDates] = useState<Set<string>>(new Set());
   const [layersOpen, setLayersOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
+  const [exportErr, setExportErr] = useState('');
+  const [printData, setPrintData] = useState<PageData[] | null>(null);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
 
@@ -135,6 +140,50 @@ export default function Home() {
     setPopover((prev) => (prev?.wordId === wordId ? null : { wordId, x, y }));
   }, []);
 
+  // تصدير PDF: جلب صفحات النطاق ثم فتح نافذة الطباعة بعد جاهزية الخط
+  const MAX_EXPORT_PAGES = 50;
+
+  const normalizeDigits = (s: string) =>
+    s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+
+  const doExport = async () => {
+    const from = exportFrom ? Number(normalizeDigits(exportFrom)) : page;
+    const to = exportTo ? Number(normalizeDigits(exportTo)) : from;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > TOTAL_PAGES) {
+      setExportErr(`أدخلي أرقام صفحات بين ١ و${toArabicDigits(TOTAL_PAGES)}`);
+      return;
+    }
+    if (to < from) {
+      setExportErr('صفحة النهاية قبل صفحة البداية');
+      return;
+    }
+    if (to - from + 1 > MAX_EXPORT_PAGES) {
+      setExportErr(`الحد الأقصى ${toArabicDigits(MAX_EXPORT_PAGES)} صفحة في التصدير الواحد`);
+      return;
+    }
+    setExportErr('');
+    const nums = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+    const datas = await Promise.all(nums.map(fetchPage));
+    setExportOpen(false);
+    setPrintData(datas);
+  };
+
+  useEffect(() => {
+    if (!printData) return;
+    let cancelled = false;
+    // ننتظر تحميل خط المصحف قبل فتح الطباعة حتى لا تخرج الصفحات بخط بديل
+    document.fonts.ready.then(() => {
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        window.print();
+        setPrintData(null);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [printData]);
+
   const currentChapter = data?.verses[0]?.chapter ?? 1;
   const popoverMarks = popover ? pageMarks.get(popover.wordId) ?? [] : [];
   const sessionMark = popoverMarks.find((m) => m.date === sessionDate);
@@ -148,7 +197,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex-1 flex flex-col items-center gap-5 px-4 py-6">
+    <main className="app-root flex-1 flex flex-col items-center gap-5 px-4 py-6">
       {/* الترويسة */}
       <header className="w-full max-w-xl flex items-center justify-between">
         <h1 className="text-2xl font-extrabold" style={{ color: 'var(--green-deep)' }}>
@@ -195,6 +244,17 @@ export default function Home() {
           </button>
           <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= TOTAL_PAGES}>
             التالية ◀
+          </button>
+          <button
+            className="nav-btn export-btn"
+            onClick={() => {
+              setExportFrom(String(page));
+              setExportTo(String(page));
+              setExportErr('');
+              setExportOpen(true);
+            }}
+          >
+            📄 تصدير PDF
           </button>
         </div>
       </div>
@@ -348,6 +408,78 @@ export default function Home() {
       <footer className="text-xs opacity-60 font-semibold pb-2">
         النص القرآني وفق مصحف المدينة النبوية — مجمع الملك فهد لطباعة المصحف الشريف
       </footer>
+
+      {/* نافذة تصدير PDF */}
+      {exportOpen && (
+        <div className="export-backdrop" onClick={() => setExportOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>📄 تصدير PDF</h2>
+            <p className="export-hint">
+              يُصدَّر المصحف بالأخطاء الظاهرة حالياً حسب الجلسات المفعّلة في «جلسات
+              التسميع». اتركي الحقلين كما هما لتصدير الصفحة الحالية فقط.
+            </p>
+            <div className="export-range">
+              <label>
+                من صفحة
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={exportFrom}
+                  onChange={(e) => setExportFrom(e.target.value)}
+                />
+              </label>
+              <label>
+                إلى صفحة
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={exportTo}
+                  onChange={(e) => setExportTo(e.target.value)}
+                />
+              </label>
+            </div>
+            {exportErr && <p className="export-error">⚠️ {exportErr}</p>}
+            <div className="export-actions">
+              <button className="nav-btn" onClick={doExport}>
+                🖨️ طباعة / حفظ PDF
+              </button>
+              <button className="cancel-btn" onClick={() => setExportOpen(false)}>
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* حاوية الطباعة — تظهر فقط في نافذة الطباعة */}
+      {printData && (
+        <div className="print-root">
+          {printData.map((d) => (
+            <div key={d.page} className="print-page">
+              <div className="print-head">
+                <span>📖 رصد — متابعة أخطاء التسميع</span>
+                <span>{formatArabicDate(todayISO())}</span>
+              </div>
+              <div className="print-legend">
+                {(Object.keys(ERROR_TYPES) as ErrorType[]).map((k) => (
+                  <span
+                    key={k}
+                    className="legend-chip"
+                    style={{ background: ERROR_TYPES[k].bg, borderColor: ERROR_TYPES[k].color }}
+                  >
+                    {ERROR_TYPES[k].label}
+                  </span>
+                ))}
+              </div>
+              <MushafPage
+                data={d}
+                chapters={chapterMap}
+                marks={marksByWord(visibleMarks, d.page)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
