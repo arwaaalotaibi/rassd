@@ -21,6 +21,7 @@ import {
   type Chapter,
   type PageData,
 } from '@/lib/quran';
+import { deleteRemoteMarks, fetchRemoteMarks, getSupabase, pushMarks } from '@/lib/supabase';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -53,6 +54,7 @@ export default function Home() {
   const [exportErr, setExportErr] = useState('');
   const [exportBusy, setExportBusy] = useState('');
   const [printData, setPrintData] = useState<PageData[] | null>(null);
+  const [syncState, setSyncState] = useState<'off' | 'syncing' | 'ok' | 'error'>('off');
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
 
@@ -74,7 +76,8 @@ export default function Home() {
   useEffect(() => {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
-    setMarks(loadMarks());
+    const local = loadMarks();
+    setMarks(local);
     try {
       const hidden = JSON.parse(localStorage.getItem('rassd:hiddenDates') ?? '[]');
       if (Array.isArray(hidden)) setHiddenDates(new Set(hidden));
@@ -82,6 +85,29 @@ export default function Home() {
     fetch('/quran/chapters.json')
       .then((r) => r.json())
       .then(setChapters);
+
+    // مزامنة أولية مع السحابة: دمج المحلي والسحابي (الأحدث يغلب عند التعارض)
+    if (!getSupabase()) return;
+    setSyncState('syncing');
+    fetchRemoteMarks().then(async (remote) => {
+      if (remote === null) {
+        setSyncState('error');
+        return;
+      }
+      const merged = new Map<string, ErrorMark>();
+      for (const m of [...local, ...remote]) {
+        const prev = merged.get(m.id);
+        if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
+      }
+      const all = [...merged.values()];
+      setMarks(all);
+      saveMarks(all);
+      // رفع ما لم يصل السحابة بعد
+      const remoteIds = new Set(remote.map((m) => m.id));
+      const missing = all.filter((m) => !remoteIds.has(m.id));
+      const ok = await pushMarks(missing);
+      setSyncState(ok ? 'ok' : 'error');
+    });
   }, []);
 
   const updateHiddenDates = useCallback((next: Set<string>) => {
@@ -320,6 +346,23 @@ export default function Home() {
         <span className="error-count">
           كلمات مرصودة في الصفحة: {toArabicDigits(pageErrorCount)}
         </span>
+        <span
+          className={`sync-badge sync-${syncState}`}
+          title={
+            syncState === 'ok'
+              ? 'الرصد محفوظ في السحابة'
+              : syncState === 'syncing'
+                ? 'جاري المزامنة…'
+                : syncState === 'error'
+                  ? 'تعذّرت المزامنة — الرصد محفوظ محلياً وسيُرفع لاحقاً'
+                  : 'الحفظ محلي فقط'
+          }
+        >
+          {syncState === 'ok' && '☁️ متزامن'}
+          {syncState === 'syncing' && '⏳ يزامن…'}
+          {syncState === 'error' && '⚠️ محلي'}
+          {syncState === 'off' && '💾 محلي'}
+        </span>
       </div>
 
       {/* لوحة الطبقات — كل تاريخ جلسة طبقة مستقلة */}
@@ -412,12 +455,18 @@ export default function Home() {
                     className={`type-btn ${sessionMark?.type === k ? 'active' : ''}`}
                     style={{ background: ERROR_TYPES[k].bg, color: ERROR_TYPES[k].color }}
                     onClick={() => {
-                      updateMarks(upsertMark(marks, popover.wordId, page, k, sessionDate));
+                      const next = upsertMark(marks, popover.wordId, page, k, sessionDate);
+                      updateMarks(next);
+                      const added = next.find((m) => m.id === `${popover.wordId}@${sessionDate}`);
+                      if (added && getSupabase()) {
+                        setSyncState('syncing');
+                        pushMarks([added]).then((ok) => setSyncState(ok ? 'ok' : 'error'));
+                      }
                       // رصد على طبقة مخفيّة يُظهرها تلقائياً حتى لا يختفي الرصد الجديد
                       if (hiddenDates.has(sessionDate)) {
-                        const next = new Set(hiddenDates);
-                        next.delete(sessionDate);
-                        updateHiddenDates(next);
+                        const nextHidden = new Set(hiddenDates);
+                        nextHidden.delete(sessionDate);
+                        updateHiddenDates(nextHidden);
                       }
                       setPopover(null);
                     }}
@@ -431,6 +480,12 @@ export default function Home() {
                   className="remove-btn"
                   onClick={() => {
                     updateMarks(removeWordMarks(marks, popover.wordId));
+                    if (getSupabase()) {
+                      setSyncState('syncing');
+                      deleteRemoteMarks(popover.wordId).then((ok) =>
+                        setSyncState(ok ? 'ok' : 'error')
+                      );
+                    }
                     setPopover(null);
                   }}
                 >
