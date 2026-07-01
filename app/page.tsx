@@ -171,13 +171,18 @@ export default function Home() {
   useEffect(() => {
     if (!printData) return;
     let cancelled = false;
-    // ننتظر تحميل خط المصحف قبل فتح الطباعة حتى لا تخرج الصفحات بخط بديل
+    // ننتظر تحميل خط المصحف واكتمال الرسم قبل فتح الطباعة حتى لا تخرج الصفحات فارغة أو بخط بديل
     document.fonts.ready.then(() => {
       if (cancelled) return;
-      requestAnimationFrame(() => {
-        window.print();
-        setPrintData(null);
-      });
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          setTimeout(() => {
+            if (cancelled) return;
+            window.print();
+            setPrintData(null);
+          }, 120)
+        )
+      );
     });
     return () => {
       cancelled = true;

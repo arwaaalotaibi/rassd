@@ -588,11 +588,65 @@ body {
 
   .print-page {
     break-after: page;
-    width: 172mm;
+    width: 165mm;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 4mm;
+  }
+
+  /* استعلامات الحاوية (cqw) لا تعمل داخل الطباعة في كروم → مقاسات ثابتة بالمليمتر */
+  .print-page .mushaf-page {
+    container-type: normal;
+    padding: 7mm 6.5mm 5mm;
+  }
+
+  .print-page .page-meta {
+    font-size: 4.2mm;
+    padding: 0 1.6mm 2mm;
+    margin-bottom: 2.6mm;
+  }
+
+  .print-page .mushaf-line {
+    font-size: 7.4mm;
+  }
+
+  .print-page .basmala-line {
+    font-size: 6.8mm;
+  }
+
+  .print-page .surah-header {
+    padding: 1mm 0;
+  }
+
+  .print-page .surah-header-band {
+    gap: 3mm;
+    padding: 1mm 3mm;
+    font-size: 5.8mm;
+  }
+
+  .print-page .surah-header-band::before,
+  .print-page .surah-header-band::after {
+    font-size: 4.8mm;
+  }
+
+  .print-page .page-number {
+    padding-top: 2.3mm;
+    font-size: 4.5mm;
+  }
+
+  .print-page .mushaf-page.ornate .mushaf-lines {
+    margin: auto 6.5mm;
+    gap: 2mm;
+    padding: 6.5mm 5.5mm;
+  }
+
+  .print-page .mushaf-page.ornate .mushaf-line {
+    min-height: 14mm;
+  }
+
+  .print-page .mushaf-page.ornate .surah-header {
+    padding-bottom: 2.5mm;
   }
 
   .print-page:last-child {
