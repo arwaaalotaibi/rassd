@@ -229,7 +229,7 @@ export default function Home() {
       <div className="layers-panel w-full max-w-xl">
         <button className="layers-header" onClick={() => setLayersOpen(!layersOpen)}>
           <span>
-            🎚️ طبقات التواريخ{' '}
+            🗓️ جلسات التسميع{' '}
             {layers.length > 0 && (
               <span className="layers-count">{toArabicDigits(layers.length)}</span>
             )}
@@ -241,7 +241,8 @@ export default function Home() {
           <div className="layers-body">
             {layers.length === 0 ? (
               <p className="layers-empty">
-                لا توجد طبقات بعد — ارصدي أول خطأ وستظهر جلسة اليوم هنا كطبقة.
+                لا توجد جلسات بعد — ارصدي أول خطأ وستظهر جلسة اليوم هنا،
+                وتقدرين تخفين أخطاء أي جلسة أو تظهرينها متى شئتِ.
               </p>
             ) : (
               <>
@@ -260,7 +261,7 @@ export default function Home() {
                       key={l.date}
                       className={`layer-row ${hidden ? 'hidden-layer' : ''}`}
                       onClick={() => toggleLayer(l.date)}
-                      title={hidden ? 'إظهار الطبقة' : 'إخفاء الطبقة'}
+                      title={hidden ? 'إظهار أخطاء هذه الجلسة' : 'إخفاء أخطاء هذه الجلسة'}
                     >
                       <span className="layer-eye">{hidden ? '◡' : '👁'}</span>
                       <span className="layer-date">
