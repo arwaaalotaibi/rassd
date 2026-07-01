@@ -22,6 +22,7 @@ import {
   type PageData,
 } from '@/lib/quran';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const pageCache = new Map<number, PageData>();
 
@@ -456,35 +457,37 @@ export default function Home() {
         </div>
       )}
 
-      {/* حاوية الطباعة — تظهر فقط في نافذة الطباعة */}
-      {printData && (
-        <div className="print-root">
-          {printData.map((d) => (
-            <div key={d.page} className="print-page">
-              <div className="print-head">
-                <span>📖 رصد — متابعة أخطاء التسميع</span>
-                <span>{formatArabicDate(todayISO())}</span>
+      {/* حاوية الطباعة — خارج شجرة التطبيق (portal) حتى لا يخفيها إخفاء .app-root وقت الطباعة */}
+      {printData &&
+        createPortal(
+          <div className="print-root">
+            {printData.map((d) => (
+              <div key={d.page} className="print-page">
+                <div className="print-head">
+                  <span>📖 رصد — متابعة أخطاء التسميع</span>
+                  <span>{formatArabicDate(todayISO())}</span>
+                </div>
+                <div className="print-legend">
+                  {(Object.keys(ERROR_TYPES) as ErrorType[]).map((k) => (
+                    <span
+                      key={k}
+                      className="legend-chip"
+                      style={{ background: ERROR_TYPES[k].bg, borderColor: ERROR_TYPES[k].color }}
+                    >
+                      {ERROR_TYPES[k].label}
+                    </span>
+                  ))}
+                </div>
+                <MushafPage
+                  data={d}
+                  chapters={chapterMap}
+                  marks={marksByWord(visibleMarks, d.page)}
+                />
               </div>
-              <div className="print-legend">
-                {(Object.keys(ERROR_TYPES) as ErrorType[]).map((k) => (
-                  <span
-                    key={k}
-                    className="legend-chip"
-                    style={{ background: ERROR_TYPES[k].bg, borderColor: ERROR_TYPES[k].color }}
-                  >
-                    {ERROR_TYPES[k].label}
-                  </span>
-                ))}
-              </div>
-              <MushafPage
-                data={d}
-                chapters={chapterMap}
-                marks={marksByWord(visibleMarks, d.page)}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>,
+          document.body
+        )}
     </main>
   );
 }
