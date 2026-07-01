@@ -94,14 +94,27 @@ body {
   gap: 0.32em;
 }
 
+/* صفحتا الفاتحة وبداية البقرة: إطار مزخرف مُوسَّط في منتصف الصفحة */
 .mushaf-page.ornate .mushaf-lines {
+  flex: 0 0 auto;
+  margin: auto 4cqw;
   justify-content: center;
-  gap: 0.6cqw;
+  gap: 1.2cqw;
+  border: 4px double var(--gold);
+  border-radius: 16px;
+  background: rgba(184, 145, 47, 0.05);
+  box-shadow: 0 0 0 5px rgba(184, 145, 47, 0.12);
+  padding: 4cqw 3.5cqw;
 }
 
 .mushaf-page.ornate .mushaf-line {
   flex: 0 0 auto;
   min-height: 8.5cqw;
+}
+
+.mushaf-page.ornate .surah-header {
+  flex: 0 0 auto;
+  padding-bottom: 1.5cqw;
 }
 
 .word {
