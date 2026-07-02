@@ -72,6 +72,16 @@ type ListEntry =
   | { kind: 'date'; date: string; count: number }
   | { kind: 'mark'; m: ErrorMark };
 
+// لون خلية الخريطة الحرارية حسب عدد الأخطاء في الصفحة
+function heatColor(count: number): string {
+  if (count === 0) return 'rgba(20, 97, 74, 0.08)';
+  if (count <= 1) return '#f3dfa0';
+  if (count <= 2) return '#ecc272';
+  if (count <= 4) return '#e09b4c';
+  if (count <= 7) return '#cf6a38';
+  return '#c0392b';
+}
+
 export default function Home() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<PageData | null>(null);
@@ -122,6 +132,7 @@ export default function Home() {
   const [importBusy, setImportBusy] = useState(false);
   const [copiedStudentId, setCopiedStudentId] = useState('');
   const [onlineCount, setOnlineCount] = useState(0);
+  const [mapOpen, setMapOpen] = useState(false);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -174,6 +185,13 @@ export default function Home() {
   const pageMarks = useMemo(() => marksByWord(visibleMarks, page), [visibleMarks, page]);
   const pageErrorCount = useMemo(() => pageMarks.size, [pageMarks]);
   const stats = useMemo(() => computeStats(marks), [marks]);
+
+  // كثافة الأخطاء لكل صفحة (للخريطة الحرارية)
+  const pageHeat = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const m of marks) map.set(m.page, (map.get(m.page) ?? 0) + 1);
+    return map;
+  }, [marks]);
 
   // قائمة الأخطاء مجمّعة بالجلسات (الأحدث أولاً) ومرتبة بالصفحة ثم موضع الكلمة
   const marksByDate = useMemo(() => {
@@ -754,6 +772,9 @@ export default function Home() {
           <button className="nav-btn" onClick={() => setStatsOpen(true)}>
             📊 الإحصاءات
           </button>
+          <button className="nav-btn" onClick={() => setMapOpen(true)}>
+            🗺️ الخريطة
+          </button>
         </div>
       </div>
 
@@ -1028,6 +1049,58 @@ export default function Home() {
                 disabled={!!exportBusy}
               >
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* الخريطة الحرارية للمصحف */}
+      {mapOpen && (
+        <div className="export-backdrop" onClick={() => setMapOpen(false)}>
+          <div
+            className="export-dialog controls stats-dialog heat-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>🗺️ خريطة {activeName ?? 'مصحفي'}</h2>
+            <p className="export-hint">
+              كل مربّع صفحة من مصحفك الـ{toArabicDigits(TOTAL_PAGES)} — كلما احمرّ
+              زادت أخطاؤه. اضغطي أي صفحة للانتقال إليها.
+            </p>
+            <div className="heat-legend">
+              <span>متقنة</span>
+              {[0, 1, 2, 4, 7, 9].map((c) => (
+                <i key={c} className="heat-cell-demo" style={{ background: heatColor(c) }} />
+              ))}
+              <span>تحتاج مراجعة</span>
+            </div>
+            <div className="heat-grid">
+              {Array.from({ length: TOTAL_PAGES }, (_, i) => i + 1).map((p) => {
+                const count = pageHeat.get(p) ?? 0;
+                return (
+                  <button
+                    key={p}
+                    className={`heat-cell ${p === page ? 'current' : ''}`}
+                    style={{ background: heatColor(count) }}
+                    title={`صفحة ${toArabicDigits(p)}${
+                      count ? ` — ${toArabicDigits(count)} ${count === 1 ? 'رصد' : 'أرصاد'}` : ''
+                    }`}
+                    onClick={() => {
+                      go(p);
+                      setMapOpen(false);
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <p className="heat-summary">
+              {stats.pagesCount === 0
+                ? 'ما في أخطاء مرصودة بعد — الخريطة كلها بانتظارك 🌱'
+                : `${toArabicDigits(stats.pagesCount)} صفحة فيها رصد من أصل ${toArabicDigits(TOTAL_PAGES)}`}
+            </p>
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setMapOpen(false)}>
+                إغلاق
               </button>
             </div>
           </div>
