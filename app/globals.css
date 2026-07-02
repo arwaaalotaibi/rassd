@@ -732,12 +732,19 @@ body {
   flex-wrap: wrap;
 }
 
-.share-card-capture {
+/* مضيف LTR يلتفّ على البطاقة ويُصوَّر هو (يمنع قصّ مكتبة التصوير في الاتجاه RTL)،
+   مخفيّ خارج الحافة اليسرى بإحداثيات LTR صريحة بلا التباس */
+.share-host {
+  position: fixed;
+  top: 0;
+  left: -10000px;
   direction: ltr;
-  width: fit-content; /* يلتصق بمقاس البطاقة بالضبط — بلا هوامش زائدة */
+  width: fit-content;
+  pointer-events: none;
 }
 
 .share-card {
+  box-sizing: border-box;
   width: 700px;
   direction: rtl;
   background:
@@ -751,6 +758,7 @@ body {
   gap: 22px;
   color: #fdfaf1;
   font-family: inherit;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -832,61 +840,6 @@ body {
   border-top: 1px solid rgba(217, 196, 138, 0.4);
   padding-top: 14px;
   margin-top: 8px;
-}
-
-/* ————— الخريطة الحرارية ————— */
-.heat-dialog {
-  max-width: 480px;
-}
-
-.heat-grid {
-  display: grid;
-  grid-template-columns: repeat(20, 1fr);
-  gap: 3px;
-  direction: rtl;
-}
-
-.heat-cell {
-  aspect-ratio: 1;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: transform 80ms ease;
-  border: none;
-  padding: 0;
-}
-
-.heat-cell:hover {
-  transform: scale(1.35);
-  outline: 1.5px solid var(--green-deep);
-  z-index: 2;
-}
-
-.heat-cell.current {
-  outline: 2px solid var(--green-deep);
-  outline-offset: 1px;
-}
-
-.heat-legend {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  opacity: 0.85;
-}
-
-.heat-cell-demo {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-}
-
-.heat-summary {
-  text-align: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--green-deep);
 }
 
 /* قائمة الأخطاء التفصيلية */
