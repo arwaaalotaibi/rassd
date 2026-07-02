@@ -715,7 +715,7 @@ export default function Home() {
     }
   };
 
-  // سماع الآية بصوت العفاسي (تلاوات everyayah المجانية) — ضغطة تشغّل وضغطة توقف
+  // سماع الآية بصوت العفاسي (CDN تلاوات quran.com المجاني) — ضغطة تشغّل وضغطة توقف
   const toggleAyahAudio = useCallback(
     (surah: number, ayah: number) => {
       const key = `${surah}:${ayah}`;
@@ -728,7 +728,7 @@ export default function Home() {
       audioRef.current?.pause();
       const pad = (n: number) => String(n).padStart(3, '0');
       const audio = new Audio(
-        `https://everyayah.com/data/Alafasy_128_kbps/${pad(surah)}${pad(ayah)}.mp3`
+        `https://verses.quran.com/Alafasy/mp3/${pad(surah)}${pad(ayah)}.mp3`
       );
       audioRef.current = audio;
       setPlayingAyah(key);
