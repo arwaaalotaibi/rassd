@@ -745,6 +745,76 @@ body {
   padding: 0 8px;
 }
 
+/* تصفية قائمة الأخطاء + طباعتها */
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  font-size: 11px;
+  font-weight: 800;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  background: rgba(33, 48, 31, 0.06);
+  color: var(--ink);
+}
+
+.filter-chip.active {
+  border-color: currentColor;
+}
+
+.jump-btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.print-list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.print-list-rows .error-word {
+  font-size: 26px;
+  min-width: 90px;
+}
+
+.print-list-rows .error-meta {
+  font-size: 15px;
+}
+
+.print-list-rows .error-list-date {
+  font-size: 15px;
+}
+
+.error-meta-page {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-deep);
+  white-space: nowrap;
+}
+
+.print-page-footer {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-deep);
+  border-top: 1px solid var(--gold-soft);
+  padding-top: 6px;
+}
+
 /* ————— لوحة الطبقات ————— */
 .layers-panel {
   background: var(--paper);

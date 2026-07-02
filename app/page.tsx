@@ -67,6 +67,10 @@ async function fetchPage(p: number): Promise<PageData> {
 
 type Popover = { wordId: string; x: number; y: number };
 
+type ListEntry =
+  | { kind: 'date'; date: string; count: number }
+  | { kind: 'mark'; m: ErrorMark };
+
 export default function Home() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<PageData | null>(null);
@@ -109,6 +113,9 @@ export default function Home() {
   const [otpBusy, setOtpBusy] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [wordTexts, setWordTexts] = useState<Map<string, string>>(new Map());
+  const [errorFilter, setErrorFilter] = useState<ErrorType | 'all'>('all');
+  const [listPrint, setListPrint] = useState<ListEntry[][] | null>(null);
+  const [listBusy, setListBusy] = useState('');
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -179,6 +186,18 @@ export default function Home() {
         ),
       }));
   }, [marks]);
+
+  // القائمة بعد تصفية نوع الخطأ
+  const filteredByDate = useMemo(
+    () =>
+      marksByDate
+        .map((g) => ({
+          date: g.date,
+          list: errorFilter === 'all' ? g.list : g.list.filter((m) => m.type === errorFilter),
+        }))
+        .filter((g) => g.list.length > 0),
+    [marksByDate, errorFilter]
+  );
 
   // نصوص الكلمات المرصودة: تُجلب صفحاتها عند فتح الإحصاءات
   useEffect(() => {
@@ -500,6 +519,60 @@ export default function Home() {
       setExportBusy('');
       setPrintData(null);
     }
+  };
+
+  // تصدير قائمة الأخطاء PDF: تقسيم الصفوف على صفحات A4 ثم نفس خط أنابيب التصوير
+  const doListExport = async () => {
+    if (filteredByDate.length === 0) return;
+    setListBusy('يجهّز القائمة…');
+    try {
+      const entries: ListEntry[] = [];
+      for (const g of filteredByDate) {
+        entries.push({ kind: 'date', date: g.date, count: g.list.length });
+        for (const m of g.list) entries.push({ kind: 'mark', m });
+      }
+      const PER_PAGE = 16;
+      const chunks: ListEntry[][] = [];
+      for (let i = 0; i < entries.length; i += PER_PAGE) chunks.push(entries.slice(i, i + PER_PAGE));
+      setListPrint(chunks);
+      await document.fonts.ready;
+      for (let tries = 0; tries < 60; tries++) {
+        if (document.querySelectorAll('.print-page').length >= chunks.length) break;
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      await new Promise((r) => setTimeout(r, 150));
+
+      const [{ toCanvas }, { jsPDF }] = await Promise.all([
+        import('html-to-image'),
+        import('jspdf'),
+      ]);
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>('.print-page'));
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+      const MARGIN = 8;
+      for (let i = 0; i < nodes.length; i++) {
+        setListBusy(`يصوّر (${toArabicDigits(i + 1)}/${toArabicDigits(nodes.length)})…`);
+        const canvas = await toCanvas(nodes[i], { pixelRatio: 2, backgroundColor: '#ffffff' });
+        const ratio = canvas.width / canvas.height;
+        const maxW = 210 - MARGIN * 2;
+        let w = maxW;
+        let h = w / ratio;
+        const maxH = 297 - MARGIN * 2;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (210 - w) / 2, MARGIN, w, h);
+      }
+      pdf.save(`rassd-errors${errorFilter !== 'all' ? `-${errorFilter}` : ''}.pdf`);
+    } catch {
+      setListBusy('');
+      setListPrint(null);
+      alert('تعذّر إنشاء الملف — جرّبي مرة أخرى');
+      return;
+    }
+    setListBusy('');
+    setListPrint(null);
   };
 
   const currentChapter = data?.verses[0]?.chapter ?? 1;
@@ -1000,7 +1073,37 @@ export default function Home() {
 
                 {/* قائمة الأخطاء التفصيلية: الكلمة والسورة ورقم الآية */}
                 <h3 className="stats-title">📝 قائمة الأخطاء</h3>
-                {marksByDate.map(({ date, list }) => (
+                <div className="filter-row">
+                  <div className="filter-chips">
+                    <button
+                      className={`filter-chip ${errorFilter === 'all' ? 'active' : ''}`}
+                      onClick={() => setErrorFilter('all')}
+                    >
+                      الكل ({toArabicDigits(marks.length)})
+                    </button>
+                    {(Object.keys(ERROR_TYPES) as ErrorType[]).map((k) => (
+                      <button
+                        key={k}
+                        className={`filter-chip ${errorFilter === k ? 'active' : ''}`}
+                        style={{ color: ERROR_TYPES[k].color, background: ERROR_TYPES[k].bg }}
+                        onClick={() => setErrorFilter(errorFilter === k ? 'all' : k)}
+                      >
+                        {ERROR_TYPES[k].label} ({toArabicDigits(stats.types[k])})
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="jump-btn"
+                    disabled={!!listBusy || filteredByDate.length === 0}
+                    onClick={doListExport}
+                  >
+                    {listBusy || '🖨️ حفظ PDF'}
+                  </button>
+                </div>
+                {filteredByDate.length === 0 && (
+                  <p className="layers-empty">لا أخطاء من هذا النوع 🎉</p>
+                )}
+                {filteredByDate.map(({ date, list }) => (
                   <div key={date} className="error-list-group">
                     <h4 className="error-list-date">
                       🗓️ {formatArabicDate(date)} — {arabicWordCount(list.length)}
@@ -1393,6 +1496,63 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* حاوية طباعة قائمة الأخطاء */}
+      {listPrint &&
+        createPortal(
+          <div className="print-root">
+            {listPrint.map((chunk, ci) => (
+              <div key={ci} className="print-page">
+                <div className="print-head">
+                  <span>
+                    📖 رصد — قائمة أخطاء {activeName ?? 'مصحفي'}
+                    {errorFilter !== 'all' && ` (${ERROR_TYPES[errorFilter].label} فقط)`}
+                  </span>
+                  <span>{formatArabicDate(todayISO())}</span>
+                </div>
+                <div className="print-list-rows">
+                  {chunk.map((e, i) =>
+                    e.kind === 'date' ? (
+                      <h4 key={i} className="error-list-date">
+                        🗓️ {formatArabicDate(e.date)} — {arabicWordCount(e.count)}
+                      </h4>
+                    ) : (
+                      (() => {
+                        const [surah, ayah] = e.m.wordId.split(':');
+                        const t = ERROR_TYPES[e.m.type];
+                        return (
+                          <div key={i} className="error-item">
+                            <span
+                              className="error-word"
+                              style={{
+                                background: t.bg,
+                                boxShadow: `inset 0 -0.12em 0 0 ${t.color}`,
+                              }}
+                            >
+                              {wordTexts.get(e.m.wordId) ?? ''}
+                            </span>
+                            <span className="error-meta">
+                              <b>سورة {chapterMap.get(Number(surah))?.name ?? surah}</b> — آية{' '}
+                              {toArabicDigits(ayah)}
+                              <i className="error-type-tag" style={{ color: t.color }}>
+                                {t.label}
+                              </i>
+                            </span>
+                            <span className="error-meta-page">صفحة {toArabicDigits(e.m.page)}</span>
+                          </div>
+                        );
+                      })()
+                    )
+                  )}
+                </div>
+                <div className="print-page-footer">
+                  {toArabicDigits(ci + 1)} / {toArabicDigits(listPrint.length)}
+                </div>
+              </div>
+            ))}
+          </div>,
+          document.body
+        )}
 
       {/* حاوية الطباعة — خارج شجرة التطبيق (portal) حتى لا يخفيها إخفاء .app-root وقت الطباعة */}
       {printData &&
