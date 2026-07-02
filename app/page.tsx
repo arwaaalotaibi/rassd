@@ -133,6 +133,14 @@ export default function Home() {
   const [copiedStudentId, setCopiedStudentId] = useState('');
   const [onlineCount, setOnlineCount] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
+  const [shareCard, setShareCard] = useState<{
+    name: string;
+    sessions: number;
+    marksCount: number;
+    repeated: number;
+    improvement: number | null;
+  } | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -654,6 +662,57 @@ export default function Home() {
     setListPrint(null);
   };
 
+  // بطاقة تقرير الأسبوع: صورة أنيقة تُشارك واتساب (آخر ٧ أيام مقارنةً بالسبعة قبلها)
+  const doShareCard = async () => {
+    setShareBusy(true);
+    try {
+      const isoDaysAgo = (n: number) => {
+        const d = new Date();
+        d.setDate(d.getDate() - n);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        return `${d.getFullYear()}-${m}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      const weekStart = isoDaysAgo(6);
+      const prevStart = isoDaysAgo(13);
+      const cur = marks.filter((m) => m.date >= weekStart);
+      const prev = marks.filter((m) => m.date >= prevStart && m.date < weekStart);
+      const improvement =
+        prev.length > 0 ? Math.round(((prev.length - cur.length) / prev.length) * 100) : null;
+      setShareCard({
+        name: activeName ?? 'مصحفي',
+        sessions: new Set(cur.map((m) => m.date)).size,
+        marksCount: cur.length,
+        repeated: stats.repeatedWords,
+        improvement,
+      });
+      await document.fonts.ready;
+      for (let tries = 0; tries < 60; tries++) {
+        if (document.querySelector('.share-card')) break;
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      await new Promise((r) => setTimeout(r, 150));
+      const node = document.querySelector<HTMLElement>('.share-card');
+      if (!node) throw new Error('no card');
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(node, { pixelRatio: 2 });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], 'rassd-report.png', { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'تقرير رصد' }).catch(() => {});
+      } else {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'rassd-report.png';
+        a.click();
+      }
+    } catch {
+      alert('تعذّر إنشاء البطاقة — جرّبي مرة أخرى');
+    } finally {
+      setShareBusy(false);
+      setShareCard(null);
+    }
+  };
+
   const currentChapter = data?.verses[0]?.chapter ?? 1;
   const popoverMarks = popover ? pageMarks.get(popover.wordId) ?? [] : [];
   const sessionMark = popoverMarks.find((m) => m.date === sessionDate);
@@ -1114,7 +1173,14 @@ export default function Home() {
             className="export-dialog controls stats-dialog"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2>📊 إحصاءات {activeName ?? 'مصحفي'}</h2>
+            <div className="stats-head-row">
+              <h2>📊 إحصاءات {activeName ?? 'مصحفي'}</h2>
+              {stats.totalWords > 0 && (
+                <button className="jump-btn" disabled={shareBusy} onClick={doShareCard}>
+                  {shareBusy ? '⏳ يجهّز…' : '📤 بطاقة مشاركة'}
+                </button>
+              )}
+            </div>
 
             {stats.totalWords === 0 ? (
               <p className="layers-empty">
@@ -1689,6 +1755,44 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* بطاقة المشاركة — تُرسم خارج الشاشة ثم تُصوَّر وتُشارَك */}
+      {shareCard &&
+        createPortal(
+          <div className="print-root">
+            <div className="share-card">
+              <div className="share-brand">📖 رصد</div>
+              <div className="share-title">تقرير الأسبوع</div>
+              <div className="share-name">{shareCard.name}</div>
+              <div className="share-stats">
+                <div className="share-stat">
+                  <b>{toArabicDigits(shareCard.sessions)}</b>
+                  <span>{shareCard.sessions === 1 ? 'جلسة تسميع' : 'جلسات تسميع'}</span>
+                </div>
+                <div className="share-stat">
+                  <b>{toArabicDigits(shareCard.marksCount)}</b>
+                  <span>أخطاء مرصودة</span>
+                </div>
+                <div className="share-stat">
+                  <b>{toArabicDigits(shareCard.repeated)}</b>
+                  <span>كلمات متكرّرة</span>
+                </div>
+              </div>
+              {shareCard.improvement !== null && (
+                <div className={`share-improve ${shareCard.improvement >= 0 ? 'good' : 'bad'}`}>
+                  {shareCard.improvement >= 0
+                    ? `📉 الأخطاء أقل بنسبة ${toArabicDigits(Math.abs(shareCard.improvement))}٪ عن الأسبوع الماضي — ما شاء الله!`
+                    : `📈 الأخطاء زادت ${toArabicDigits(Math.abs(shareCard.improvement))}٪ عن الأسبوع الماضي — نشدّ الهمّة 💪`}
+                </div>
+              )}
+              <div className="share-footer">
+                <span>{formatArabicDate(todayISO())}</span>
+                <span>rassd.vercel.app</span>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* حاوية طباعة قائمة الأخطاء */}
       {listPrint &&

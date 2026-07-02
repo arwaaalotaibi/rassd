@@ -723,6 +723,111 @@ body {
   background: var(--green-deep);
 }
 
+/* ————— بطاقة المشاركة ————— */
+.stats-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.share-card {
+  width: 620px;
+  direction: rtl;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #17715a 0%, var(--green-deep) 70%);
+  border: 10px solid var(--gold);
+  border-radius: 28px;
+  padding: 42px 36px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  color: #fdfaf1;
+  font-family: inherit;
+}
+
+.share-brand {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.share-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gold-soft);
+}
+
+.share-name {
+  font-size: 34px;
+  font-weight: 800;
+  border-bottom: 2px solid var(--gold);
+  padding-bottom: 10px;
+}
+
+.share-stats {
+  display: flex;
+  gap: 14px;
+  width: 100%;
+  justify-content: center;
+}
+
+.share-stat {
+  flex: 1;
+  max-width: 170px;
+  background: rgba(253, 250, 241, 0.1);
+  border: 1.5px solid rgba(217, 196, 138, 0.5);
+  border-radius: 18px;
+  padding: 18px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.share-stat b {
+  font-size: 44px;
+  line-height: 1;
+  color: var(--gold-soft);
+}
+
+.share-stat span {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.share-improve {
+  font-size: 16px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 9px 22px;
+}
+
+.share-improve.good {
+  background: rgba(90, 200, 140, 0.2);
+  color: #b8f0d0;
+}
+
+.share-improve.bad {
+  background: rgba(230, 140, 90, 0.18);
+  color: #ffd9b8;
+}
+
+.share-footer {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-soft);
+  border-top: 1px solid rgba(217, 196, 138, 0.4);
+  padding-top: 12px;
+  margin-top: 6px;
+}
+
 /* ————— الخريطة الحرارية ————— */
 .heat-dialog {
   max-width: 480px;
