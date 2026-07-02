@@ -734,7 +734,7 @@ body {
 
 .share-card-capture {
   direction: ltr;
-  width: 724px; /* عرض البطاقة + إطارها */
+  width: fit-content; /* يلتصق بمقاس البطاقة بالضبط — بلا هوامش زائدة */
 }
 
 .share-card {
