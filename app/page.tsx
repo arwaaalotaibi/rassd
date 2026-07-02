@@ -121,6 +121,7 @@ export default function Home() {
   const [importMsg, setImportMsg] = useState('');
   const [importBusy, setImportBusy] = useState(false);
   const [copiedStudentId, setCopiedStudentId] = useState('');
+  const [onlineCount, setOnlineCount] = useState(0);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -347,6 +348,28 @@ export default function Home() {
     };
     boot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // عدّاد المتواجدين الآن: حضور لحظي عبر Supabase Realtime Presence
+  // (المفتاح = هوية الجهاز، فالشخص الواحد بعدة تبويبات يُحسب مرة واحدة)
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+    const channel = sb.channel('rassd-online', {
+      config: { presence: { key: getDeviceId() } },
+    });
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        setOnlineCount(Object.keys(channel.presenceState()).length);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.track({ online_at: new Date().toISOString() });
+        }
+      });
+    return () => {
+      sb.removeChannel(channel);
+    };
   }, []);
 
   const updateHiddenDates = useCallback((next: Set<string>) => {
@@ -807,6 +830,11 @@ export default function Home() {
           {syncState === 'error' && '⚠️ محلي'}
           {syncState === 'off' && '💾 محلي'}
         </span>
+        {onlineCount > 0 && (
+          <span className="online-badge" title="عدد المتواجدين في التطبيق الآن">
+            <i className="online-dot" /> المتواجدون الآن: {toArabicDigits(onlineCount)}
+          </span>
+        )}
         {syncState !== 'off' && (
           <button
             className="link-devices-btn"
