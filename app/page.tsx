@@ -141,6 +141,8 @@ export default function Home() {
     improvement: number | null;
   } | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
+  const [playingAyah, setPlayingAyah] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -713,6 +715,30 @@ export default function Home() {
     }
   };
 
+  // سماع الآية بصوت العفاسي (تلاوات everyayah المجانية) — ضغطة تشغّل وضغطة توقف
+  const toggleAyahAudio = useCallback(
+    (surah: number, ayah: number) => {
+      const key = `${surah}:${ayah}`;
+      if (playingAyah === key) {
+        audioRef.current?.pause();
+        audioRef.current = null;
+        setPlayingAyah(null);
+        return;
+      }
+      audioRef.current?.pause();
+      const pad = (n: number) => String(n).padStart(3, '0');
+      const audio = new Audio(
+        `https://everyayah.com/data/Alafasy_128_kbps/${pad(surah)}${pad(ayah)}.mp3`
+      );
+      audioRef.current = audio;
+      setPlayingAyah(key);
+      audio.onended = () => setPlayingAyah(null);
+      audio.onerror = () => setPlayingAyah(null);
+      audio.play().catch(() => setPlayingAyah(null));
+    },
+    [playingAyah]
+  );
+
   const currentChapter = data?.verses[0]?.chapter ?? 1;
   const popoverMarks = popover ? pageMarks.get(popover.wordId) ?? [] : [];
   const sessionMark = popoverMarks.find((m) => m.date === sessionDate);
@@ -1042,6 +1068,17 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              <button
+                className="listen-btn"
+                onClick={() => {
+                  const [s, a] = popover.wordId.split(':').map(Number);
+                  toggleAyahAudio(s, a);
+                }}
+              >
+                {playingAyah === popover.wordId.split(':').slice(0, 2).join(':')
+                  ? '⏹ إيقاف التلاوة'
+                  : '🔊 سماع الآية'}
+              </button>
               {popoverMarks.length > 0 && (
                 <button
                   className="remove-btn"

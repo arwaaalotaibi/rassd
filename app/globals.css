@@ -1216,6 +1216,20 @@ body {
   cursor: pointer;
 }
 
+.listen-btn {
+  border-radius: 10px;
+  padding: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-deep);
+  background: rgba(20, 97, 74, 0.09);
+  cursor: pointer;
+}
+
+.listen-btn:hover {
+  background: rgba(20, 97, 74, 0.17);
+}
+
 .remove-btn:hover {
   background: rgba(192, 57, 43, 0.16);
 }
