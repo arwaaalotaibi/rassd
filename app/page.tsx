@@ -35,6 +35,7 @@ import {
   addTeacherLink,
   adoptSyncCode,
   deleteRemoteMarks,
+  fetchMarksByCode,
   fetchMyLinkedStudents,
   fetchMyTeachers,
   fetchRemoteMarks,
@@ -116,6 +117,10 @@ export default function Home() {
   const [errorFilter, setErrorFilter] = useState<ErrorType | 'all'>('all');
   const [listPrint, setListPrint] = useState<ListEntry[][] | null>(null);
   const [listBusy, setListBusy] = useState('');
+  const [importCode, setImportCode] = useState('');
+  const [importMsg, setImportMsg] = useState('');
+  const [importBusy, setImportBusy] = useState(false);
+  const [copiedStudentId, setCopiedStudentId] = useState('');
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -395,10 +400,10 @@ export default function Home() {
     if (identityRef.current) saveMarks(identityRef.current, next);
   }, []);
 
-  // إدارة الطلاب
+  // إدارة الطلاب — الرمز اختياري: إن تُرك فارغاً نولّد رمزاً جديداً (طالب بلا حساب ولا تطبيق)
   const addStudent = () => {
     const name = newName.trim();
-    const code = newCode.trim().toLowerCase();
+    const code = newCode.trim() ? newCode.trim().toLowerCase() : crypto.randomUUID();
     if (!name) {
       setStudentMsg('اكتبي اسم الطالب');
       return;
@@ -423,6 +428,39 @@ export default function Home() {
     setStudentMsg('');
     setStudentsOpen(false);
     switchProfile(code);
+  };
+
+  // استيراد رصد قديم برمز إلى هوية المالكة (حساب أو جهاز)
+  const doImport = async () => {
+    const code = importCode.trim().toLowerCase();
+    if (!UUID_RE.test(code)) {
+      setImportMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
+      return;
+    }
+    setImportBusy(true);
+    setImportMsg('');
+    const imported = await fetchMarksByCode(code);
+    setImportBusy(false);
+    if (imported === null) {
+      setImportMsg('تعذّر الجلب — تأكدي من الرمز والاتصال');
+      return;
+    }
+    if (imported.length === 0) {
+      setImportMsg('لا يوجد رصد محفوظ على هذا الرمز');
+      return;
+    }
+    const owner = ownerRef.current;
+    const merged = new Map<string, ErrorMark>();
+    for (const m of [...loadMarks(owner), ...imported]) {
+      const prev = merged.get(m.id);
+      if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
+    }
+    const all = [...merged.values()];
+    saveMarks(owner, all);
+    await pushMarks(owner, all);
+    if (identityRef.current === owner) setMarks(all);
+    setImportCode('');
+    setImportMsg(`✅ تم استيراد ${arabicWordCount(imported.length)} إلى مصحفك`);
   };
 
   const removeStudent = (id: string) => {
@@ -1300,7 +1338,18 @@ export default function Home() {
                     <span className="student-name">
                       🎓 {s.name} {s.cloud && <em className="cloud-tag">☁️ بحسابه</em>}
                     </span>
-                    <code>{s.id.slice(0, 8)}…</code>
+                    <button
+                      className="copy-code-btn"
+                      title="نسخ رمز الطالب — أرسليه له ليستلم جلساته في جهازه أو حسابه"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(s.id).then(() => {
+                          setCopiedStudentId(s.id);
+                          setTimeout(() => setCopiedStudentId(''), 2000);
+                        });
+                      }}
+                    >
+                      {copiedStudentId === s.id ? '✓ نُسخ' : '📋 رمزه'}
+                    </button>
                     <button
                       className="student-remove"
                       title={
@@ -1324,11 +1373,11 @@ export default function Home() {
                 ))}
               </div>
             )}
-            {user && (
-              <p className="export-hint dim-hint">
-                أو أضيفي يدوياً طالباً ليس له حساب Google (برمز جهازه):
-              </p>
-            )}
+            <p className="export-hint dim-hint">
+              {user
+                ? 'أو أضيفي طالباً بلا حساب: بالاسم فقط (نولّد له رمزاً) أو برمز جهازه إن كان عنده التطبيق. لاحقاً أرسلي له رمزه من زر «📋 رمزه» ليستلم كل جلساته.'
+                : 'أضيفي الطالب بالاسم فقط (نولّد له رمزاً) أو برمز جهازه إن كان عنده التطبيق.'}
+            </p>
             <label className="sync-code-label">
               اسم الطالب:
               <input
@@ -1339,13 +1388,13 @@ export default function Home() {
               />
             </label>
             <label className="sync-code-label">
-              رمز الطالب:
+              رمز الطالب (اختياري):
               <input
                 type="text"
                 dir="ltr"
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                placeholder="اتركيه فارغاً لطالب بلا تطبيق"
               />
             </label>
             {studentMsg && <p className="export-error">⚠️ {studentMsg}</p>}
@@ -1466,6 +1515,40 @@ export default function Home() {
                 </button>
               </div>
             )}
+
+            {/* استيراد رصد قديم: إذا كانت المعلّمة ترصد لك برمز قبل إنشاء حسابك */}
+            {user && (
+              <div className="teachers-section">
+                <h3>📥 استيراد رصد قديم</h3>
+                <p className="export-hint">
+                  إذا كانت معلّمتك ترصد لك برمز قبل أن يكون لك حساب: اطلبي منها
+                  رمزك (زر «📋 رمزه» عندها) والصقيه هنا — كل جلساتك القديمة تنتقل
+                  إلى حسابك.
+                </p>
+                <label className="sync-code-label">
+                  الرمز القديم:
+                  <input
+                    type="text"
+                    dir="ltr"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    value={importCode}
+                    onChange={(e) => setImportCode(e.target.value)}
+                  />
+                </label>
+                {importMsg && (
+                  <p className={importMsg.startsWith('✅') ? 'import-ok' : 'export-error'}>
+                    {importMsg}
+                  </p>
+                )}
+                <button
+                  className="nav-btn"
+                  disabled={!importCode.trim() || importBusy}
+                  onClick={doImport}
+                >
+                  {importBusy ? '⏳ يستورد…' : '📥 استيراد إلى مصحفي'}
+                </button>
+              </div>
+            )}
             {linkMsg && <p className="export-error">⚠️ {linkMsg}</p>}
             <div className="export-actions">
               {!user && (
@@ -1473,6 +1556,7 @@ export default function Home() {
                   className="nav-btn"
                   disabled={!linkInput.trim()}
                   onClick={() => {
+                    const oldId = getDeviceId();
                     const result = adoptSyncCode(linkInput);
                     if (result === 'invalid') {
                       setLinkMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
@@ -1482,7 +1566,15 @@ export default function Home() {
                       setLinkMsg('هذا رمز جهازك الحالي نفسه');
                       return;
                     }
-                    // إعادة تحميل: المزامنة الأولية تدمج رصد الجهازين وترفع الناقص
+                    // دمج رصد الهوية القديمة محلياً في الجديدة قبل إعادة التحميل،
+                    // والمزامنة الأولية بعدها ترفع الناقص للسحابة
+                    const newId = linkInput.trim().toLowerCase();
+                    const merged = new Map<string, ErrorMark>();
+                    for (const m of [...loadMarks(newId), ...loadMarks(oldId)]) {
+                      const prev = merged.get(m.id);
+                      if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
+                    }
+                    saveMarks(newId, [...merged.values()]);
                     window.location.reload();
                   }}
                 >

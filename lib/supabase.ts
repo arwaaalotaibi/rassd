@@ -197,6 +197,20 @@ function rowToMark(r: Row): ErrorMark {
   };
 }
 
+// جلب رصد أي رمز (لاستيراد رصد قديم إلى حساب): عميل مؤقت بترويسة الرمز نفسه
+export async function fetchMarksByCode(code: string): Promise<ErrorMark[] | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  const temp = createClient(url, key, {
+    global: { headers: { 'x-device-id': code } },
+    auth: { persistSession: false },
+  });
+  const { data, error } = await temp.from('error_marks').select('*').eq('device_id', code);
+  if (error) return null;
+  return (data as Row[]).map(rowToMark);
+}
+
 export async function fetchRemoteMarks(identity: string): Promise<ErrorMark[] | null> {
   const sb = getSupabase();
   if (!sb) return null;
