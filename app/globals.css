@@ -733,38 +733,39 @@ body {
 }
 
 .share-card {
-  width: 620px;
+  width: 700px;
   direction: rtl;
   background:
     radial-gradient(120% 90% at 50% 0%, #17715a 0%, var(--green-deep) 70%);
-  border: 10px solid var(--gold);
-  border-radius: 28px;
-  padding: 42px 36px 26px;
+  border: 12px solid var(--gold);
+  border-radius: 30px;
+  padding: 48px 40px 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 22px;
   color: #fdfaf1;
   font-family: inherit;
+  -webkit-font-smoothing: antialiased;
 }
 
 .share-brand {
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 800;
   letter-spacing: 0.5px;
 }
 
 .share-title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--gold-soft);
 }
 
 .share-name {
-  font-size: 34px;
+  font-size: 40px;
   font-weight: 800;
-  border-bottom: 2px solid var(--gold);
-  padding-bottom: 10px;
+  border-bottom: 2.5px solid var(--gold);
+  padding-bottom: 12px;
 }
 
 .share-stats {
@@ -776,34 +777,34 @@ body {
 
 .share-stat {
   flex: 1;
-  max-width: 170px;
+  max-width: 195px;
   background: rgba(253, 250, 241, 0.1);
-  border: 1.5px solid rgba(217, 196, 138, 0.5);
-  border-radius: 18px;
-  padding: 18px 8px;
+  border: 2px solid rgba(217, 196, 138, 0.5);
+  border-radius: 20px;
+  padding: 22px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .share-stat b {
-  font-size: 44px;
+  font-size: 54px;
   line-height: 1;
   color: var(--gold-soft);
 }
 
 .share-stat span {
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 700;
   opacity: 0.9;
 }
 
 .share-improve {
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 800;
   border-radius: 999px;
-  padding: 9px 22px;
+  padding: 11px 26px;
 }
 
 .share-improve.good {
@@ -820,12 +821,12 @@ body {
   width: 100%;
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--gold-soft);
   border-top: 1px solid rgba(217, 196, 138, 0.4);
-  padding-top: 12px;
-  margin-top: 6px;
+  padding-top: 14px;
+  margin-top: 8px;
 }
 
 /* ————— الخريطة الحرارية ————— */

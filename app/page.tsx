@@ -727,7 +727,7 @@ export default function Home() {
       const node = document.querySelector<HTMLElement>('.share-card');
       if (!node) throw new Error('no card');
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(node, { pixelRatio: 2 });
+      const dataUrl = await toPng(node, { pixelRatio: 3 });
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], 'rassd-report.png', { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
