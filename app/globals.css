@@ -732,6 +732,11 @@ body {
   flex-wrap: wrap;
 }
 
+.share-card-capture {
+  direction: ltr;
+  width: 724px; /* عرض البطاقة + إطارها */
+}
+
 .share-card {
   width: 700px;
   direction: rtl;

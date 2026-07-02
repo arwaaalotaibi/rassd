@@ -724,10 +724,14 @@ export default function Home() {
         await new Promise((r) => requestAnimationFrame(r));
       }
       await new Promise((r) => setTimeout(r, 150));
-      const node = document.querySelector<HTMLElement>('.share-card');
+      const node = document.querySelector<HTMLElement>('.share-card-capture');
       if (!node) throw new Error('no card');
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(node, { pixelRatio: 3 });
+      const dataUrl = await toPng(node, {
+        pixelRatio: 3,
+        width: node.offsetWidth,
+        height: node.offsetHeight,
+      });
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], 'rassd-report.png', { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
@@ -1830,7 +1834,9 @@ export default function Home() {
       {shareCard &&
         createPortal(
           <div className="print-root">
-            <div className="share-card">
+            {/* غلاف LTR: مكتبة التصوير تقصّ الحافة اليمنى إذا كان الجذر الملتقَط RTL */}
+            <div className="share-card-capture" dir="ltr">
+            <div className="share-card" dir="rtl">
               <div className="share-brand">📖 رصد</div>
               <div className="share-title">تقرير الأسبوع</div>
               <div className="share-name">{shareCard.name}</div>
@@ -1859,6 +1865,7 @@ export default function Home() {
                 <span>{formatArabicDate(todayISO())}</span>
                 <span>rassd.vercel.app</span>
               </div>
+            </div>
             </div>
           </div>,
           document.body
