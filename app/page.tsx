@@ -43,8 +43,10 @@ import {
   pushMarks,
   removeTeacherLink,
   setIdentity,
+  sendEmailOtp,
   signInWithGoogle,
   signOutAccount,
+  verifyEmailOtp,
   type TeacherLink,
 } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -98,6 +100,12 @@ export default function Home() {
   const [teacherCode, setTeacherCode] = useState('');
   const [teacherLabel, setTeacherLabel] = useState('');
   const [teacherMsg, setTeacherMsg] = useState('');
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailVal, setEmailVal] = useState('');
+  const [otpVal, setOtpVal] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpMsg, setOtpMsg] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -498,16 +506,30 @@ export default function Home() {
             </button>
           </div>
         ) : syncState !== 'off' ? (
-          <button
-            className="google-btn"
-            onClick={async () => {
-              setAuthErr('');
-              const err = await signInWithGoogle();
-              if (err) setAuthErr(err);
-            }}
-          >
-            <span className="google-g">G</span> الدخول بحساب Google
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              className="google-btn"
+              onClick={async () => {
+                setAuthErr('');
+                const err = await signInWithGoogle();
+                if (err) setAuthErr(err);
+              }}
+            >
+              <span className="google-g">G</span> الدخول بـ Google
+            </button>
+            <button
+              className="google-btn"
+              onClick={() => {
+                setEmailVal('');
+                setOtpVal('');
+                setOtpSent(false);
+                setOtpMsg('');
+                setEmailOpen(true);
+              }}
+            >
+              ✉️ برمز إيميل
+            </button>
+          </div>
         ) : null}
         {authErr && <p className="export-error w-full">⚠️ {authErr}</p>}
       </header>
@@ -831,6 +853,113 @@ export default function Home() {
                 إلغاء
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة الدخول برمز الإيميل */}
+      {emailOpen && (
+        <div className="export-backdrop" onClick={() => !otpBusy && setEmailOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>✉️ الدخول برمز الإيميل</h2>
+            {!otpSent ? (
+              <>
+                <p className="export-hint">
+                  اكتبي إيميلك وبنرسل لك رمز دخول — بدون كلمة مرور نهائياً. إذا
+                  كانت أول مرة، ينشأ حسابك تلقائياً.
+                </p>
+                <label className="sync-code-label">
+                  الإيميل:
+                  <input
+                    type="email"
+                    dir="ltr"
+                    placeholder="name@example.com"
+                    value={emailVal}
+                    onChange={(e) => setEmailVal(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && emailVal.includes('@') && !otpBusy && (async () => {
+                      setOtpBusy(true);
+                      setOtpMsg('');
+                      const err = await sendEmailOtp(emailVal.trim());
+                      setOtpBusy(false);
+                      if (err) setOtpMsg(err);
+                      else setOtpSent(true);
+                    })()}
+                  />
+                </label>
+                {otpMsg && <p className="export-error">⚠️ {otpMsg}</p>}
+                <div className="export-actions">
+                  <button
+                    className="nav-btn"
+                    disabled={!emailVal.includes('@') || otpBusy}
+                    onClick={async () => {
+                      setOtpBusy(true);
+                      setOtpMsg('');
+                      const err = await sendEmailOtp(emailVal.trim());
+                      setOtpBusy(false);
+                      if (err) setOtpMsg(err);
+                      else setOtpSent(true);
+                    }}
+                  >
+                    {otpBusy ? '⏳ يرسل…' : '📨 أرسلي الرمز'}
+                  </button>
+                  <button className="cancel-btn" onClick={() => setEmailOpen(false)}>
+                    إلغاء
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="export-hint">
+                  أرسلنا رمزاً إلى <b dir="ltr">{emailVal.trim()}</b> — اكتبيه هنا
+                  (أو اضغطي رابط الدخول في الرسالة نفسها). تفقّدي «غير المرغوب» إذا
+                  تأخّر.
+                </p>
+                <label className="sync-code-label">
+                  الرمز:
+                  <input
+                    type="text"
+                    dir="ltr"
+                    inputMode="numeric"
+                    placeholder="123456"
+                    className="otp-input"
+                    value={otpVal}
+                    onChange={(e) => setOtpVal(e.target.value)}
+                    autoFocus
+                  />
+                </label>
+                {otpMsg && <p className="export-error">⚠️ {otpMsg}</p>}
+                <div className="export-actions">
+                  <button
+                    className="nav-btn"
+                    disabled={otpVal.trim().length < 6 || otpBusy}
+                    onClick={async () => {
+                      setOtpBusy(true);
+                      setOtpMsg('');
+                      const err = await verifyEmailOtp(emailVal.trim(), otpVal);
+                      setOtpBusy(false);
+                      if (err) {
+                        setOtpMsg(err);
+                        return;
+                      }
+                      setEmailOpen(false);
+                      // onAuthStateChange يتكفّل بتبنّي البيانات وتحديث الواجهة
+                    }}
+                  >
+                    {otpBusy ? '⏳ يتحقق…' : '✅ دخول'}
+                  </button>
+                  <button
+                    className="cancel-btn"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtpVal('');
+                      setOtpMsg('');
+                    }}
+                  >
+                    ↩︎ تغيير الإيميل
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

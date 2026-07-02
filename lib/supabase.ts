@@ -65,6 +65,28 @@ export async function signInWithGoogle(): Promise<string | null> {
   return error ? error.message : null;
 }
 
+// دخول برمز الإيميل: يُرسل رمز ٦ أرقام (ورابط دخول احتياطي) بلا كلمة مرور
+export async function sendEmailOtp(email: string): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return 'المزامنة غير مفعّلة';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
+  });
+  if (!error) return null;
+  if (error.status === 429) return 'محاولات كثيرة — انتظري دقائق ثم أعيدي';
+  return error.message;
+}
+
+export async function verifyEmailOtp(email: string, token: string): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return 'المزامنة غير مفعّلة';
+  const { error } = await sb.auth.verifyOtp({ email, token: token.trim(), type: 'email' });
+  if (!error) return null;
+  if (error.message.toLowerCase().includes('expired')) return 'الرمز انتهت صلاحيته — أرسلي رمزاً جديداً';
+  return 'الرمز غير صحيح — تأكدي منه وأعيدي';
+}
+
 export async function signOutAccount() {
   const sb = getSupabase();
   if (sb) await sb.auth.signOut();

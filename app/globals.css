@@ -539,6 +539,12 @@ body {
   color: var(--green-deep);
 }
 
+.otp-input {
+  font-size: 22px !important;
+  letter-spacing: 0.35em;
+  font-weight: 800;
+}
+
 /* ————— لوحة الطبقات ————— */
 .layers-panel {
   background: var(--paper);
