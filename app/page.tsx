@@ -8,6 +8,7 @@ import {
   formatArabicDate,
   loadMarks,
   marksByWord,
+  migrateLegacyMarks,
   removeWordMarks,
   saveMarks,
   todayISO,
@@ -15,6 +16,14 @@ import {
   type ErrorMark,
   type ErrorType,
 } from '@/lib/errors';
+import {
+  UUID_RE,
+  loadActiveStudent,
+  loadStudents,
+  saveActiveStudent,
+  saveStudents,
+  type StudentProfile,
+} from '@/lib/profiles';
 import {
   TOTAL_PAGES,
   toArabicDigits,
@@ -28,6 +37,7 @@ import {
   getDeviceId,
   getSupabase,
   pushMarks,
+  setIdentity,
 } from '@/lib/supabase';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -66,8 +76,19 @@ export default function Home() {
   const [linkInput, setLinkInput] = useState('');
   const [linkMsg, setLinkMsg] = useState('');
   const [copied, setCopied] = useState(false);
+  const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [activeStudent, setActiveStudent] = useState<string | null>(null);
+  const [studentsOpen, setStudentsOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCode, setNewCode] = useState('');
+  const [studentMsg, setStudentMsg] = useState('');
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
+  const identityRef = useRef(''); // الهوية النشطة: صاحبة الجهاز أو الطالب المختار
+
+  const activeName = activeStudent
+    ? students.find((s) => s.id === activeStudent)?.name ?? 'الطالب'
+    : null;
 
   const chapterMap = useMemo(
     () => new Map(chapters.map((c) => [c.id, c])),
@@ -83,47 +104,86 @@ export default function Home() {
   const pageMarks = useMemo(() => marksByWord(visibleMarks, page), [visibleMarks, page]);
   const pageErrorCount = useMemo(() => pageMarks.size, [pageMarks]);
 
-  // استرجاع آخر صفحة + العلامات + الطبقات المخفية + تحميل أسماء السور
+  // مزامنة هوية معيّنة مع السحابة: دمج المحلي والسحابي (الأحدث يغلب) ورفع الناقص
+  const syncFor = useCallback(async (identity: string, local: ErrorMark[]) => {
+    if (!getSupabase()) return;
+    setSyncState('syncing');
+    const remote = await fetchRemoteMarks();
+    if (identityRef.current !== identity) return; // تم التبديل لملف آخر أثناء الجلب
+    if (remote === null) {
+      setSyncState('error');
+      return;
+    }
+    const merged = new Map<string, ErrorMark>();
+    for (const m of [...local, ...remote]) {
+      const prev = merged.get(m.id);
+      if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
+    }
+    const all = [...merged.values()];
+    setMarks(all);
+    saveMarks(identity, all);
+    const remoteIds = new Set(remote.map((m) => m.id));
+    const missing = all.filter((m) => !remoteIds.has(m.id));
+    const ok = await pushMarks(missing);
+    if (identityRef.current === identity) setSyncState(ok ? 'ok' : 'error');
+  }, []);
+
+  // التبديل بين «مصحفي» وملفات الطلاب: كل هوية لها علاماتها وجلساتها وطبقاتها
+  const switchProfile = useCallback(
+    (studentId: string | null) => {
+      setActiveStudent(studentId);
+      saveActiveStudent(studentId);
+      const identity = studentId ?? getDeviceId();
+      identityRef.current = identity;
+      setIdentity(studentId);
+      setPopover(null);
+      const local = loadMarks(identity);
+      setMarks(local);
+      try {
+        const h = JSON.parse(
+          localStorage.getItem(`rassd:hiddenDates:${identity}`) ?? '[]'
+        );
+        setHiddenDates(new Set(Array.isArray(h) ? h : []));
+      } catch {
+        setHiddenDates(new Set());
+      }
+      syncFor(identity, local);
+    },
+    [syncFor]
+  );
+
+  // استرجاع آخر صفحة + الملفات + تحميل أسماء السور
   useEffect(() => {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
-    const local = loadMarks();
-    setMarks(local);
-    try {
-      const hidden = JSON.parse(localStorage.getItem('rassd:hiddenDates') ?? '[]');
-      if (Array.isArray(hidden)) setHiddenDates(new Set(hidden));
-    } catch {}
     fetch('/quran/chapters.json')
       .then((r) => r.json())
       .then(setChapters);
 
-    // مزامنة أولية مع السحابة: دمج المحلي والسحابي (الأحدث يغلب عند التعارض)
-    if (!getSupabase()) return;
-    setSyncState('syncing');
-    fetchRemoteMarks().then(async (remote) => {
-      if (remote === null) {
-        setSyncState('error');
-        return;
+    // ترحيل التخزين القديم (ما قبل الملفات) إلى مفتاح هوية صاحبة الجهاز
+    const owner = getDeviceId();
+    migrateLegacyMarks(owner);
+    const oldHidden = localStorage.getItem('rassd:hiddenDates');
+    if (oldHidden !== null) {
+      if (localStorage.getItem(`rassd:hiddenDates:${owner}`) === null) {
+        localStorage.setItem(`rassd:hiddenDates:${owner}`, oldHidden);
       }
-      const merged = new Map<string, ErrorMark>();
-      for (const m of [...local, ...remote]) {
-        const prev = merged.get(m.id);
-        if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
-      }
-      const all = [...merged.values()];
-      setMarks(all);
-      saveMarks(all);
-      // رفع ما لم يصل السحابة بعد
-      const remoteIds = new Set(remote.map((m) => m.id));
-      const missing = all.filter((m) => !remoteIds.has(m.id));
-      const ok = await pushMarks(missing);
-      setSyncState(ok ? 'ok' : 'error');
-    });
+      localStorage.removeItem('rassd:hiddenDates');
+    }
+
+    const st = loadStudents();
+    setStudents(st);
+    const act = loadActiveStudent();
+    switchProfile(act && st.some((s) => s.id === act) ? act : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateHiddenDates = useCallback((next: Set<string>) => {
     setHiddenDates(next);
-    localStorage.setItem('rassd:hiddenDates', JSON.stringify([...next]));
+    localStorage.setItem(
+      `rassd:hiddenDates:${identityRef.current}`,
+      JSON.stringify([...next])
+    );
   }, []);
 
   const toggleLayer = useCallback(
@@ -166,8 +226,45 @@ export default function Home() {
 
   const updateMarks = useCallback((next: ErrorMark[]) => {
     setMarks(next);
-    saveMarks(next);
+    if (identityRef.current) saveMarks(identityRef.current, next);
   }, []);
+
+  // إدارة الطلاب
+  const addStudent = () => {
+    const name = newName.trim();
+    const code = newCode.trim().toLowerCase();
+    if (!name) {
+      setStudentMsg('اكتبي اسم الطالب');
+      return;
+    }
+    if (!UUID_RE.test(code)) {
+      setStudentMsg('رمز الطالب غير صحيح — الطالب ينسخه من «🔗 أجهزتي» في جهازه');
+      return;
+    }
+    if (code === getDeviceId().toLowerCase()) {
+      setStudentMsg('هذا رمزك أنتِ وليس رمز طالب');
+      return;
+    }
+    if (students.some((s) => s.id === code)) {
+      setStudentMsg('هذا الطالب مضاف من قبل');
+      return;
+    }
+    const next = [...students, { id: code, name }];
+    setStudents(next);
+    saveStudents(next);
+    setNewName('');
+    setNewCode('');
+    setStudentMsg('');
+    setStudentsOpen(false);
+    switchProfile(code);
+  };
+
+  const removeStudent = (id: string) => {
+    const next = students.filter((s) => s.id !== id);
+    setStudents(next);
+    saveStudents(next);
+    if (activeStudent === id) switchProfile(null);
+  };
 
   const onWordClick = useCallback((wordId: string, el: HTMLElement) => {
     const wrap = pageWrapRef.current;
@@ -331,6 +428,38 @@ export default function Home() {
             📄 تصدير PDF
           </button>
         </div>
+      </div>
+
+      {/* شريط الملفات: أرصد في مصحفي أو مصحف أحد طلابي */}
+      <div className="controls profile-bar w-full max-w-xl">
+        <label className="profile-label">
+          ✍️ أرصد في:
+          <select
+            value={activeStudent ?? ''}
+            onChange={(e) => {
+              if (e.target.value === '__manage') {
+                setStudentMsg('');
+                setStudentsOpen(true);
+                return;
+              }
+              switchProfile(e.target.value || null);
+            }}
+            aria-label="اختيار المصحف"
+          >
+            <option value="">👤 مصحفي</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                🎓 {s.name}
+              </option>
+            ))}
+            <option value="__manage">👥 إدارة طلابي…</option>
+          </select>
+        </label>
+        {activeName && (
+          <span className="student-active-badge">
+            الرصد يُحفظ في مصحف {activeName} ويظهر عنده مباشرة
+          </span>
+        )}
       </div>
 
       {/* شريط جلسة التسميع: التاريخ + دليل الألوان + عدّاد */}
@@ -571,6 +700,65 @@ export default function Home() {
         </div>
       )}
 
+      {/* نافذة إدارة الطلاب */}
+      {studentsOpen && (
+        <div className="export-backdrop" onClick={() => setStudentsOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>👥 طلابي</h2>
+            <p className="export-hint">
+              يفتح الطالب «رصد» في جهازه → «🔗 أجهزتي» → ينسخ رمزه ويرسله لك.
+              أضيفيه هنا باسمه ورمزه، ثم اختاريه من «أرصد في» — كل ما ترصدينه
+              يُحفظ في مصحف الطالب نفسه ويظهر في «جلسات التسميع» عنده مباشرة.
+            </p>
+            {students.length > 0 && (
+              <div className="students-list">
+                {students.map((s) => (
+                  <div key={s.id} className="student-row">
+                    <span className="student-name">🎓 {s.name}</span>
+                    <code>{s.id.slice(0, 8)}…</code>
+                    <button
+                      className="student-remove"
+                      title="إزالة الطالب من قائمتي (لا يحذف رصده)"
+                      onClick={() => removeStudent(s.id)}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="sync-code-label">
+              اسم الطالب:
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="مثال: أحمد"
+              />
+            </label>
+            <label className="sync-code-label">
+              رمز الطالب:
+              <input
+                type="text"
+                dir="ltr"
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value)}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              />
+            </label>
+            {studentMsg && <p className="export-error">⚠️ {studentMsg}</p>}
+            <div className="export-actions">
+              <button className="nav-btn" onClick={addStudent}>
+                ➕ إضافة الطالب
+              </button>
+              <button className="cancel-btn" onClick={() => setStudentsOpen(false)}>
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* نافذة ربط الأجهزة */}
       {linkOpen && (
         <div className="export-backdrop" onClick={() => setLinkOpen(false)}>
@@ -579,6 +767,7 @@ export default function Home() {
             <p className="export-hint">
               عشان يظهر نفس الرصد على جوالك وكمبيوترك: انسخي الرمز من جهازك
               الأساسي، وافتحي «رصد» على الجهاز الآخر والصقيه هناك ثم اضغطي «ربط».
+              وإذا كان لك معلّم يتابعك: أرسلي له هذا الرمز نفسه ليضيفك في «👥 طلابي».
             </p>
             <div className="sync-code-box">
               <code>{getDeviceId()}</code>
@@ -637,7 +826,9 @@ export default function Home() {
             {printData.map((d) => (
               <div key={d.page} className="print-page">
                 <div className="print-head">
-                  <span>📖 رصد — متابعة أخطاء التسميع</span>
+                  <span>
+                    📖 رصد — {activeName ? `متابعة تسميع ${activeName}` : 'متابعة أخطاء التسميع'}
+                  </span>
                   <span>{formatArabicDate(todayISO())}</span>
                 </div>
                 <div className="print-legend">

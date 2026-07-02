@@ -23,6 +23,19 @@ export function adoptSyncCode(code: string): 'ok' | 'invalid' | 'same' {
   return 'ok';
 }
 
+// الهوية النشطة: هوية صاحب الجهاز، أو رمز الطالب عندما يكون ملفه نشطاً —
+// كل عمليات القراءة والكتابة السحابية تمرّ بها
+let activeIdentity: string | null = null;
+
+export function getIdentity(): string {
+  return activeIdentity ?? getDeviceId();
+}
+
+export function setIdentity(id: string | null) {
+  activeIdentity = id;
+  client = null; // ترويسة x-device-id تتغيّر مع الهوية
+}
+
 let client: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient | null {
@@ -32,7 +45,7 @@ export function getSupabase(): SupabaseClient | null {
   if (!url || !key) return null;
   if (!client) {
     client = createClient(url, key, {
-      global: { headers: { 'x-device-id': getDeviceId() } },
+      global: { headers: { 'x-device-id': getIdentity() } },
       auth: { persistSession: false },
     });
   }
@@ -65,7 +78,7 @@ export async function fetchRemoteMarks(): Promise<ErrorMark[] | null> {
   const { data, error } = await sb
     .from('error_marks')
     .select('*')
-    .eq('device_id', getDeviceId());
+    .eq('device_id', getIdentity());
   if (error) return null;
   return (data as Row[]).map(rowToMark);
 }
@@ -74,7 +87,7 @@ export async function pushMarks(marks: ErrorMark[]): Promise<boolean> {
   const sb = getSupabase();
   if (!sb || marks.length === 0) return !!sb;
   const rows = marks.map((m) => ({
-    device_id: getDeviceId(),
+    device_id: getIdentity(),
     word_id: m.wordId,
     page: m.page,
     type: m.type,
@@ -93,7 +106,7 @@ export async function deleteRemoteMarks(wordId: string, date?: string): Promise<
   let q = sb
     .from('error_marks')
     .delete()
-    .eq('device_id', getDeviceId())
+    .eq('device_id', getIdentity())
     .eq('word_id', wordId);
   if (date) q = q.eq('date', date);
   const { error } = await q;

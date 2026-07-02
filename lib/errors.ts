@@ -21,11 +21,26 @@ export type ErrorMark = {
   createdAt: number;
 };
 
-const STORAGE_KEY = 'rassd:errors:v1';
+const STORAGE_PREFIX = 'rassd:errors:v1';
 
-export function loadMarks(): ErrorMark[] {
+// التخزين المحلي معزول لكل هوية (صاحب الجهاز أو كل طالب على حدة)
+function marksKey(identity: string): string {
+  return `${STORAGE_PREFIX}:${identity}`;
+}
+
+// ترحيل التخزين القديم (قبل ملفات الطلاب) إلى مفتاح هوية صاحب الجهاز — مرة واحدة
+export function migrateLegacyMarks(ownerIdentity: string) {
+  const legacy = localStorage.getItem(STORAGE_PREFIX);
+  if (legacy === null) return;
+  if (localStorage.getItem(marksKey(ownerIdentity)) === null) {
+    localStorage.setItem(marksKey(ownerIdentity), legacy);
+  }
+  localStorage.removeItem(STORAGE_PREFIX);
+}
+
+export function loadMarks(identity: string): ErrorMark[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(marksKey(identity));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -34,8 +49,8 @@ export function loadMarks(): ErrorMark[] {
   }
 }
 
-export function saveMarks(marks: ErrorMark[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(marks));
+export function saveMarks(identity: string, marks: ErrorMark[]) {
+  localStorage.setItem(marksKey(identity), JSON.stringify(marks));
 }
 
 export function todayISO(): string {
