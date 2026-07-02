@@ -143,6 +143,10 @@ export default function Home() {
   const [shareBusy, setShareBusy] = useState(false);
   const [playingAyah, setPlayingAyah] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [liveIdentity, setLiveIdentity] = useState('');
+  const liveChannelRef = useRef<ReturnType<
+    NonNullable<ReturnType<typeof getSupabase>>['channel']
+  > | null>(null);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -278,6 +282,7 @@ export default function Home() {
       const identity = studentId ?? ownerRef.current;
       identityRef.current = identity;
       setIdentity(studentId);
+      setLiveIdentity(identity);
       setPopover(null);
       const local = loadMarks(identity);
       setMarks(local);
@@ -376,6 +381,32 @@ export default function Home() {
     };
     boot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // الجلسة الحيّة: قناة بثّ لكل مصحف — أي كتابة عن بُعد ترسل «جرساً»
+  // فيعيد الجهاز المشترك مزامنته فوراً (المعلّمة ترصد → تظهر عند الطالبة لحظياً)
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb || !liveIdentity) return;
+    const ch = sb.channel(`rassd-live-${liveIdentity}`);
+    ch.on('broadcast', { event: 'marks-changed' }, async () => {
+      // السحابة مصدر الحقيقة هنا: استبدال لا دمج، حتى لا يعود المحذوف من النسخة المحلية
+      const identity = identityRef.current;
+      const remote = await fetchRemoteMarks(identity);
+      if (remote === null || identityRef.current !== identity) return;
+      setMarks(remote);
+      saveMarks(identity, remote);
+      setSyncState('ok');
+    }).subscribe();
+    liveChannelRef.current = ch;
+    return () => {
+      sb.removeChannel(ch);
+      liveChannelRef.current = null;
+    };
+  }, [liveIdentity, syncFor]);
+
+  const broadcastChange = useCallback(() => {
+    liveChannelRef.current?.send({ type: 'broadcast', event: 'marks-changed', payload: {} });
   }, []);
 
   // عدّاد المتواجدين الآن: حضور لحظي عبر Supabase Realtime Presence
@@ -1051,9 +1082,10 @@ export default function Home() {
                       const added = next.find((m) => m.id === `${popover.wordId}@${sessionDate}`);
                       if (added && getSupabase()) {
                         setSyncState('syncing');
-                        pushMarks(identityRef.current, [added]).then((ok) =>
-                          setSyncState(ok ? 'ok' : 'error')
-                        );
+                        pushMarks(identityRef.current, [added]).then((ok) => {
+                          setSyncState(ok ? 'ok' : 'error');
+                          if (ok) broadcastChange();
+                        });
                       }
                       // رصد على طبقة مخفيّة يُظهرها تلقائياً حتى لا يختفي الرصد الجديد
                       if (hiddenDates.has(sessionDate)) {
@@ -1086,9 +1118,10 @@ export default function Home() {
                     updateMarks(removeWordMarks(marks, popover.wordId));
                     if (getSupabase()) {
                       setSyncState('syncing');
-                      deleteRemoteMarks(identityRef.current, popover.wordId).then((ok) =>
-                        setSyncState(ok ? 'ok' : 'error')
-                      );
+                      deleteRemoteMarks(identityRef.current, popover.wordId).then((ok) => {
+                        setSyncState(ok ? 'ok' : 'error');
+                        if (ok) broadcastChange();
+                      });
                     }
                     setPopover(null);
                   }}
