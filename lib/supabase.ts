@@ -77,6 +77,82 @@ export async function getSessionUser(): Promise<User | null> {
   return data.session?.user ?? null;
 }
 
+// ————— روابط المعلّم والطالب (للحسابات المسجَّلة) —————
+
+export type TeacherLink = {
+  student_id: string;
+  teacher_id: string;
+  student_name: string;
+  teacher_label: string;
+};
+
+// (جهة الطالب) معلّميّ المرتبطون بي
+export async function fetchMyTeachers(): Promise<TeacherLink[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data: session } = await sb.auth.getSession();
+  const uid = session.session?.user?.id;
+  if (!uid) return [];
+  const { data, error } = await sb
+    .from('teacher_links')
+    .select('*')
+    .eq('student_id', uid);
+  return error ? [] : (data as TeacherLink[]);
+}
+
+// (جهة الطالب) إضافة معلّم برمزه
+export async function addTeacherLink(
+  teacherCode: string,
+  myName: string,
+  teacherLabel: string
+): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return 'المزامنة غير مفعّلة';
+  const { data: session } = await sb.auth.getSession();
+  const uid = session.session?.user?.id;
+  if (!uid) return 'سجّلي الدخول أولاً';
+  const code = teacherCode.trim().toLowerCase();
+  if (!UUID_RE.test(code)) return 'رمز المعلّم غير صحيح';
+  if (code === uid) return 'هذا رمزك أنتِ وليس رمز المعلّم';
+  const { error } = await sb.from('teacher_links').insert({
+    student_id: uid,
+    teacher_id: code,
+    student_name: myName,
+    teacher_label: teacherLabel,
+  });
+  if (error) {
+    return error.code === '23505' ? 'هذا المعلّم مرتبط بك من قبل' : 'تعذّر الربط — جرّبي مرة أخرى';
+  }
+  return null;
+}
+
+// (الطرفان) فكّ الارتباط
+export async function removeTeacherLink(studentId: string, teacherId: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const { error } = await sb
+    .from('teacher_links')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('teacher_id', teacherId);
+  return !error;
+}
+
+// (جهة المعلّم) طلابي المرتبطون بي عبر حساباتهم
+export async function fetchMyLinkedStudents(): Promise<TeacherLink[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data: session } = await sb.auth.getSession();
+  const uid = session.session?.user?.id;
+  if (!uid) return [];
+  const { data, error } = await sb
+    .from('teacher_links')
+    .select('*')
+    .eq('teacher_id', uid)
+    .order('created_at');
+  return error ? [] : (data as TeacherLink[]);
+}
+
 // ————— بيانات العلامات —————
 
 type Row = {

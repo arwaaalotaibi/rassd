@@ -31,16 +31,21 @@ import {
   type PageData,
 } from '@/lib/quran';
 import {
+  addTeacherLink,
   adoptSyncCode,
   deleteRemoteMarks,
+  fetchMyLinkedStudents,
+  fetchMyTeachers,
   fetchRemoteMarks,
   getDeviceId,
   getSessionUser,
   getSupabase,
   pushMarks,
+  removeTeacherLink,
   setIdentity,
   signInWithGoogle,
   signOutAccount,
+  type TeacherLink,
 } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -88,14 +93,48 @@ export default function Home() {
   const [studentMsg, setStudentMsg] = useState('');
   const [user, setUser] = useState<User | null>(null);
   const [authErr, setAuthErr] = useState('');
+  const [cloudStudents, setCloudStudents] = useState<TeacherLink[]>([]); // طلابي المرتبطون بحساباتهم
+  const [myTeachers, setMyTeachers] = useState<TeacherLink[]>([]); // معلّميّ (جهة الطالب)
+  const [teacherCode, setTeacherCode] = useState('');
+  const [teacherLabel, setTeacherLabel] = useState('');
+  const [teacherMsg, setTeacherMsg] = useState('');
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
   const ownerRef = useRef(''); // هوية المالكة: معرّف حساب Google إن سُجّل الدخول، وإلا معرّف الجهاز
 
+  // قائمة الطلاب الموحّدة: المرتبطون بحساباتهم (سحابياً) + المضافون يدوياً برمزهم
+  const allStudents = useMemo(() => {
+    const cloud = cloudStudents.map((l) => ({
+      id: l.student_id,
+      name: l.student_name || 'طالب',
+      cloud: true,
+    }));
+    const cloudIds = new Set(cloud.map((c) => c.id));
+    const local = students
+      .filter((s) => !cloudIds.has(s.id))
+      .map((s) => ({ ...s, cloud: false }));
+    return [...cloud, ...local];
+  }, [cloudStudents, students]);
+
   const activeName = activeStudent
-    ? students.find((s) => s.id === activeStudent)?.name ?? 'الطالب'
+    ? allStudents.find((s) => s.id === activeStudent)?.name ?? 'الطالب'
     : null;
+
+  // تحميل الروابط السحابية (طلابي + معلّميّ) عند توفر حساب
+  const refreshLinks = useCallback(async (hasUser: boolean) => {
+    if (!hasUser) {
+      setCloudStudents([]);
+      setMyTeachers([]);
+      return;
+    }
+    const [studentsLinks, teacherLinks] = await Promise.all([
+      fetchMyLinkedStudents(),
+      fetchMyTeachers(),
+    ]);
+    setCloudStudents(studentsLinks);
+    setMyTeachers(teacherLinks);
+  }, []);
 
   const chapterMap = useMemo(
     () => new Map(chapters.map((c) => [c.id, c])),
@@ -210,8 +249,18 @@ export default function Home() {
       setUser(sessionUser);
       ownerRef.current = sessionUser?.id ?? dev;
       if (sessionUser) await adoptDeviceData(sessionUser.id);
+      // روابط الحساب تُجلب قبل تفعيل الملف المحفوظ حتى لا يسقط طالب سحابي محفوظ
+      let cloudIds: string[] = [];
+      if (sessionUser) {
+        const links = await fetchMyLinkedStudents();
+        setCloudStudents(links);
+        cloudIds = links.map((l) => l.student_id);
+        fetchMyTeachers().then(setMyTeachers);
+      }
       const act = loadActiveStudent();
-      switchProfile(act && st.some((s) => s.id === act) ? act : null);
+      switchProfile(
+        act && (st.some((s) => s.id === act) || cloudIds.includes(act)) ? act : null
+      );
 
       // متابعة الدخول/الخروج بعد الإقلاع
       const sb = getSupabase();
@@ -221,6 +270,7 @@ export default function Home() {
         const nextOwner = nextUser?.id ?? getDeviceId();
         if (ownerRef.current === nextOwner) return;
         ownerRef.current = nextOwner;
+        refreshLinks(!!nextUser);
         if (nextUser) {
           adoptDeviceData(nextUser.id).then(() => switchProfile(null));
         } else {
@@ -530,7 +580,7 @@ export default function Home() {
             aria-label="اختيار المصحف"
           >
             <option value="">👤 مصحفي</option>
-            {students.map((s) => (
+            {allStudents.map((s) => (
               <option key={s.id} value={s.id}>
                 🎓 {s.name}
               </option>
@@ -790,27 +840,67 @@ export default function Home() {
         <div className="export-backdrop" onClick={() => setStudentsOpen(false)}>
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
             <h2>👥 طلابي</h2>
-            <p className="export-hint">
-              يفتح الطالب «رصد» في جهازه → «🔗 أجهزتي» → ينسخ رمزه ويرسله لك.
-              أضيفيه هنا باسمه ورمزه، ثم اختاريه من «أرصد في» — كل ما ترصدينه
-              يُحفظ في مصحف الطالب نفسه ويظهر في «جلسات التسميع» عنده مباشرة.
-            </p>
-            {students.length > 0 && (
+            {user ? (
+              <>
+                <p className="export-hint">
+                  أرسلي رمزك هذا لطلابك — كل طالب مسجَّل بحسابه يضيفه من «🎓 معلّمي»
+                  عنده، فيظهر هنا باسمه تلقائياً. وعندها كل ما ترصدينه له يظهر في
+                  «جلسات التسميع» عنده مباشرة، ويستطيع إلغاء الربط متى شاء.
+                </p>
+                <div className="sync-code-box">
+                  <code>{user.id}</code>
+                  <button
+                    className="nav-btn"
+                    onClick={() =>
+                      navigator.clipboard?.writeText(user.id).then(() => setCopied(true))
+                    }
+                  >
+                    {copied ? '✓ نُسخ' : '📋 نسخ رمزي'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="export-hint">
+                يفتح الطالب «رصد» في جهازه → «🔗 أجهزتي» → ينسخ رمزه ويرسله لك.
+                أضيفيه هنا باسمه ورمزه، ثم اختاريه من «أرصد في» — كل ما ترصدينه
+                يُحفظ في مصحف الطالب نفسه ويظهر في «جلسات التسميع» عنده مباشرة.
+              </p>
+            )}
+            {allStudents.length > 0 && (
               <div className="students-list">
-                {students.map((s) => (
+                {allStudents.map((s) => (
                   <div key={s.id} className="student-row">
-                    <span className="student-name">🎓 {s.name}</span>
+                    <span className="student-name">
+                      🎓 {s.name} {s.cloud && <em className="cloud-tag">☁️ بحسابه</em>}
+                    </span>
                     <code>{s.id.slice(0, 8)}…</code>
                     <button
                       className="student-remove"
-                      title="إزالة الطالب من قائمتي (لا يحذف رصده)"
-                      onClick={() => removeStudent(s.id)}
+                      title={
+                        s.cloud
+                          ? 'فكّ الارتباط بهذا الطالب'
+                          : 'إزالة الطالب من قائمتي (لا يحذف رصده)'
+                      }
+                      onClick={async () => {
+                        if (s.cloud && user) {
+                          await removeTeacherLink(s.id, user.id);
+                          if (activeStudent === s.id) switchProfile(null);
+                          refreshLinks(true);
+                        } else {
+                          removeStudent(s.id);
+                        }
+                      }}
                     >
                       🗑
                     </button>
                   </div>
                 ))}
               </div>
+            )}
+            {user && (
+              <p className="export-hint dim-hint">
+                أو أضيفي يدوياً طالباً ليس له حساب Google (برمز جهازه):
+              </p>
             )}
             <label className="sync-code-label">
               اسم الطالب:
@@ -878,6 +968,76 @@ export default function Home() {
                   onChange={(e) => setLinkInput(e.target.value)}
                 />
               </label>
+            )}
+
+            {/* جهة الطالب: معلّميّ المرتبطون بي مع إمكانية الإلغاء */}
+            {user && (
+              <div className="teachers-section">
+                <h3>🎓 معلّمي</h3>
+                {myTeachers.length > 0 && (
+                  <div className="students-list">
+                    {myTeachers.map((t) => (
+                      <div key={t.teacher_id} className="student-row">
+                        <span className="student-name">
+                          {t.teacher_label || 'معلّمي'}
+                        </span>
+                        <code>{t.teacher_id.slice(0, 8)}…</code>
+                        <button
+                          className="student-remove"
+                          title="إلغاء مشاركة مصحفي مع هذا المعلّم"
+                          onClick={async () => {
+                            await removeTeacherLink(user.id, t.teacher_id);
+                            refreshLinks(true);
+                          }}
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="sync-code-label">
+                  رمز المعلّم:
+                  <input
+                    type="text"
+                    dir="ltr"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    value={teacherCode}
+                    onChange={(e) => setTeacherCode(e.target.value)}
+                  />
+                </label>
+                <label className="sync-code-label">
+                  اسم المعلّم (اختياري):
+                  <input
+                    type="text"
+                    value={teacherLabel}
+                    onChange={(e) => setTeacherLabel(e.target.value)}
+                    placeholder="مثال: أ. سارة"
+                  />
+                </label>
+                {teacherMsg && <p className="export-error">⚠️ {teacherMsg}</p>}
+                <button
+                  className="nav-btn"
+                  disabled={!teacherCode.trim()}
+                  onClick={async () => {
+                    setTeacherMsg('');
+                    const myName =
+                      (user.user_metadata?.name as string) ??
+                      user.email?.split('@')[0] ??
+                      'طالب';
+                    const err = await addTeacherLink(teacherCode, myName, teacherLabel.trim());
+                    if (err) {
+                      setTeacherMsg(err);
+                      return;
+                    }
+                    setTeacherCode('');
+                    setTeacherLabel('');
+                    refreshLinks(true);
+                  }}
+                >
+                  ➕ ربط معلّمي بمصحفي
+                </button>
+              </div>
             )}
             {linkMsg && <p className="export-error">⚠️ {linkMsg}</p>}
             <div className="export-actions">

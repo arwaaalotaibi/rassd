@@ -509,6 +509,36 @@ body {
   background: rgba(192, 57, 43, 0.12);
 }
 
+.cloud-tag {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--green-deep);
+  background: rgba(20, 97, 74, 0.1);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-inline-start: 4px;
+}
+
+.dim-hint {
+  opacity: 0.55;
+  border-top: 1px dashed var(--gold-soft);
+  padding-top: 10px;
+}
+
+.teachers-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px dashed var(--gold-soft);
+  padding-top: 10px;
+}
+
+.teachers-section h3 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--green-deep);
+}
+
 /* ————— لوحة الطبقات ————— */
 .layers-panel {
   background: var(--paper);
