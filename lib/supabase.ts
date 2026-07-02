@@ -1,5 +1,5 @@
-// عميل Supabase مع معرّف جهاز ثابت — كل جهاز يرى علاماته فقط (RLS عبر ترويسة x-device-id)
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+// عميل Supabase: هوية ضيف عبر ترويسة x-device-id، أو حساب Google موثّق (auth.uid)
+import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import type { ErrorMark, ErrorType } from './errors';
 
 export function getDeviceId(): string {
@@ -13,7 +13,7 @@ export function getDeviceId(): string {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// اعتماد رمز مزامنة من جهاز آخر — يصير الجهازان حساباً واحداً
+// اعتماد رمز مزامنة من جهاز آخر — يصير الجهازان حساباً واحداً (وضع الضيف)
 export function adoptSyncCode(code: string): 'ok' | 'invalid' | 'same' {
   const v = code.trim().toLowerCase();
   if (!UUID_RE.test(v)) return 'invalid';
@@ -23,8 +23,8 @@ export function adoptSyncCode(code: string): 'ok' | 'invalid' | 'same' {
   return 'ok';
 }
 
-// الهوية النشطة: هوية صاحب الجهاز، أو رمز الطالب عندما يكون ملفه نشطاً —
-// كل عمليات القراءة والكتابة السحابية تمرّ بها
+// الهوية النشطة للترويسة: رمز الطالب عندما يكون ملفه نشطاً، وإلا هوية الجهاز.
+// المستخدم المسجَّل يصل لصفوفه عبر توكن الجلسة (auth.uid) بغضّ النظر عن الترويسة.
 let activeIdentity: string | null = null;
 
 export function getIdentity(): string {
@@ -46,11 +46,38 @@ export function getSupabase(): SupabaseClient | null {
   if (!client) {
     client = createClient(url, key, {
       global: { headers: { 'x-device-id': getIdentity() } },
-      auth: { persistSession: false },
+      // جلسة الحساب محفوظة ومشتركة بين نسخ العميل عبر نفس مفتاح التخزين
+      auth: { persistSession: true, storageKey: 'rassd:auth' },
     });
   }
   return client;
 }
+
+// ————— حساب Google —————
+
+export async function signInWithGoogle(): Promise<string | null> {
+  const sb = getSupabase();
+  if (!sb) return 'المزامنة غير مفعّلة';
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin },
+  });
+  return error ? error.message : null;
+}
+
+export async function signOutAccount() {
+  const sb = getSupabase();
+  if (sb) await sb.auth.signOut();
+}
+
+export async function getSessionUser(): Promise<User | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data } = await sb.auth.getSession();
+  return data.session?.user ?? null;
+}
+
+// ————— بيانات العلامات —————
 
 type Row = {
   device_id: string;
@@ -72,22 +99,22 @@ function rowToMark(r: Row): ErrorMark {
   };
 }
 
-export async function fetchRemoteMarks(): Promise<ErrorMark[] | null> {
+export async function fetchRemoteMarks(identity: string): Promise<ErrorMark[] | null> {
   const sb = getSupabase();
   if (!sb) return null;
   const { data, error } = await sb
     .from('error_marks')
     .select('*')
-    .eq('device_id', getIdentity());
+    .eq('device_id', identity);
   if (error) return null;
   return (data as Row[]).map(rowToMark);
 }
 
-export async function pushMarks(marks: ErrorMark[]): Promise<boolean> {
+export async function pushMarks(identity: string, marks: ErrorMark[]): Promise<boolean> {
   const sb = getSupabase();
   if (!sb || marks.length === 0) return !!sb;
   const rows = marks.map((m) => ({
-    device_id: getIdentity(),
+    device_id: identity,
     word_id: m.wordId,
     page: m.page,
     type: m.type,
@@ -100,13 +127,17 @@ export async function pushMarks(marks: ErrorMark[]): Promise<boolean> {
   return !error;
 }
 
-export async function deleteRemoteMarks(wordId: string, date?: string): Promise<boolean> {
+export async function deleteRemoteMarks(
+  identity: string,
+  wordId: string,
+  date?: string
+): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
   let q = sb
     .from('error_marks')
     .delete()
-    .eq('device_id', getIdentity())
+    .eq('device_id', identity)
     .eq('word_id', wordId);
   if (date) q = q.eq('date', date);
   const { error } = await q;

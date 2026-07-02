@@ -35,10 +35,14 @@ import {
   deleteRemoteMarks,
   fetchRemoteMarks,
   getDeviceId,
+  getSessionUser,
   getSupabase,
   pushMarks,
   setIdentity,
+  signInWithGoogle,
+  signOutAccount,
 } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -82,9 +86,12 @@ export default function Home() {
   const [newName, setNewName] = useState('');
   const [newCode, setNewCode] = useState('');
   const [studentMsg, setStudentMsg] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+  const [authErr, setAuthErr] = useState('');
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
-  const identityRef = useRef(''); // الهوية النشطة: صاحبة الجهاز أو الطالب المختار
+  const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
+  const ownerRef = useRef(''); // هوية المالكة: معرّف حساب Google إن سُجّل الدخول، وإلا معرّف الجهاز
 
   const activeName = activeStudent
     ? students.find((s) => s.id === activeStudent)?.name ?? 'الطالب'
@@ -108,7 +115,7 @@ export default function Home() {
   const syncFor = useCallback(async (identity: string, local: ErrorMark[]) => {
     if (!getSupabase()) return;
     setSyncState('syncing');
-    const remote = await fetchRemoteMarks();
+    const remote = await fetchRemoteMarks(identity);
     if (identityRef.current !== identity) return; // تم التبديل لملف آخر أثناء الجلب
     if (remote === null) {
       setSyncState('error');
@@ -124,16 +131,16 @@ export default function Home() {
     saveMarks(identity, all);
     const remoteIds = new Set(remote.map((m) => m.id));
     const missing = all.filter((m) => !remoteIds.has(m.id));
-    const ok = await pushMarks(missing);
+    const ok = await pushMarks(identity, missing);
     if (identityRef.current === identity) setSyncState(ok ? 'ok' : 'error');
   }, []);
 
-  // التبديل بين «مصحفي» وملفات الطلاب: كل هوية لها علاماتها وجلساتها وطبقاتها
+  // التبديل بين مصحف المالكة وملفات الطلاب: كل هوية لها علاماتها وجلساتها وطبقاتها
   const switchProfile = useCallback(
     (studentId: string | null) => {
       setActiveStudent(studentId);
       saveActiveStudent(studentId);
-      const identity = studentId ?? getDeviceId();
+      const identity = studentId ?? ownerRef.current;
       identityRef.current = identity;
       setIdentity(studentId);
       setPopover(null);
@@ -152,7 +159,31 @@ export default function Home() {
     [syncFor]
   );
 
-  // استرجاع آخر صفحة + الملفات + تحميل أسماء السور
+  // تبنّي بيانات الجهاز عند أول دخول بالحساب: دمج علامات الجهاز في الحساب (مرة واحدة لكل حساب)
+  const adoptDeviceData = useCallback(async (uid: string) => {
+    const flag = `rassd:adopted:${uid}`;
+    if (localStorage.getItem(flag)) return;
+    const dev = getDeviceId();
+    const merged = new Map<string, ErrorMark>();
+    for (const m of [...loadMarks(uid), ...loadMarks(dev)]) {
+      const prev = merged.get(m.id);
+      if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
+    }
+    // علامات الجهاز السحابية (المرفوعة قبل إنشاء الحساب) تُضم أيضاً
+    const remoteDev = await fetchRemoteMarks(dev);
+    if (remoteDev) {
+      for (const m of remoteDev) {
+        const prev = merged.get(m.id);
+        if (!prev || m.createdAt >= prev.createdAt) merged.set(m.id, m);
+      }
+    }
+    const all = [...merged.values()];
+    saveMarks(uid, all);
+    await pushMarks(uid, all);
+    localStorage.setItem(flag, '1');
+  }, []);
+
+  // استرجاع آخر صفحة + الملفات + الحساب + تحميل أسماء السور
   useEffect(() => {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
@@ -160,21 +191,44 @@ export default function Home() {
       .then((r) => r.json())
       .then(setChapters);
 
-    // ترحيل التخزين القديم (ما قبل الملفات) إلى مفتاح هوية صاحبة الجهاز
-    const owner = getDeviceId();
-    migrateLegacyMarks(owner);
+    // ترحيل التخزين القديم (ما قبل الملفات) إلى مفتاح هوية الجهاز
+    const dev = getDeviceId();
+    migrateLegacyMarks(dev);
     const oldHidden = localStorage.getItem('rassd:hiddenDates');
     if (oldHidden !== null) {
-      if (localStorage.getItem(`rassd:hiddenDates:${owner}`) === null) {
-        localStorage.setItem(`rassd:hiddenDates:${owner}`, oldHidden);
+      if (localStorage.getItem(`rassd:hiddenDates:${dev}`) === null) {
+        localStorage.setItem(`rassd:hiddenDates:${dev}`, oldHidden);
       }
       localStorage.removeItem('rassd:hiddenDates');
     }
 
     const st = loadStudents();
     setStudents(st);
-    const act = loadActiveStudent();
-    switchProfile(act && st.some((s) => s.id === act) ? act : null);
+
+    const boot = async () => {
+      const sessionUser = await getSessionUser();
+      setUser(sessionUser);
+      ownerRef.current = sessionUser?.id ?? dev;
+      if (sessionUser) await adoptDeviceData(sessionUser.id);
+      const act = loadActiveStudent();
+      switchProfile(act && st.some((s) => s.id === act) ? act : null);
+
+      // متابعة الدخول/الخروج بعد الإقلاع
+      const sb = getSupabase();
+      sb?.auth.onAuthStateChange((_event, session) => {
+        const nextUser = session?.user ?? null;
+        setUser(nextUser);
+        const nextOwner = nextUser?.id ?? getDeviceId();
+        if (ownerRef.current === nextOwner) return;
+        ownerRef.current = nextOwner;
+        if (nextUser) {
+          adoptDeviceData(nextUser.id).then(() => switchProfile(null));
+        } else {
+          switchProfile(null);
+        }
+      });
+    };
+    boot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -370,13 +424,42 @@ export default function Home() {
   return (
     <main className="app-root flex-1 flex flex-col items-center gap-5 px-4 py-6">
       {/* الترويسة */}
-      <header className="w-full max-w-xl flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold" style={{ color: 'var(--green-deep)' }}>
-          📖 رصد
-        </h1>
-        <p className="text-sm font-semibold opacity-70">
-          مصحف إلكتروني — رواية حفص عن عاصم
-        </p>
+      <header className="w-full max-w-xl flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-extrabold" style={{ color: 'var(--green-deep)' }}>
+            📖 رصد
+          </h1>
+          <p className="text-xs font-semibold opacity-70">
+            مصحف إلكتروني — رواية حفص عن عاصم
+          </p>
+        </div>
+        {user ? (
+          <div className="account-chip">
+            {user.user_metadata?.avatar_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.user_metadata.avatar_url} alt="" className="account-avatar" />
+            )}
+            <span>{(user.user_metadata?.name as string)?.split(' ')[0] ?? 'حسابي'}</span>
+            <button
+              onClick={() => signOutAccount()}
+              title="تسجيل الخروج — يرجع البرنامج لوضع الضيف على هذا الجهاز"
+            >
+              خروج
+            </button>
+          </div>
+        ) : syncState !== 'off' ? (
+          <button
+            className="google-btn"
+            onClick={async () => {
+              setAuthErr('');
+              const err = await signInWithGoogle();
+              if (err) setAuthErr(err);
+            }}
+          >
+            <span className="google-g">G</span> الدخول بحساب Google
+          </button>
+        ) : null}
+        {authErr && <p className="export-error w-full">⚠️ {authErr}</p>}
       </header>
 
       {/* أدوات التنقل */}
@@ -513,7 +596,7 @@ export default function Home() {
               setLinkOpen(true);
             }}
           >
-            🔗 أجهزتي
+            {user ? '🔗 رمزي' : '🔗 أجهزتي'}
           </button>
         )}
       </div>
@@ -613,7 +696,9 @@ export default function Home() {
                       const added = next.find((m) => m.id === `${popover.wordId}@${sessionDate}`);
                       if (added && getSupabase()) {
                         setSyncState('syncing');
-                        pushMarks([added]).then((ok) => setSyncState(ok ? 'ok' : 'error'));
+                        pushMarks(identityRef.current, [added]).then((ok) =>
+                          setSyncState(ok ? 'ok' : 'error')
+                        );
                       }
                       // رصد على طبقة مخفيّة يُظهرها تلقائياً حتى لا يختفي الرصد الجديد
                       if (hiddenDates.has(sessionDate)) {
@@ -635,7 +720,7 @@ export default function Home() {
                     updateMarks(removeWordMarks(marks, popover.wordId));
                     if (getSupabase()) {
                       setSyncState('syncing');
-                      deleteRemoteMarks(popover.wordId).then((ok) =>
+                      deleteRemoteMarks(identityRef.current, popover.wordId).then((ok) =>
                         setSyncState(ok ? 'ok' : 'error')
                       );
                     }
@@ -763,54 +848,60 @@ export default function Home() {
       {linkOpen && (
         <div className="export-backdrop" onClick={() => setLinkOpen(false)}>
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
-            <h2>🔗 ربط أجهزتي</h2>
+            <h2>{user ? '🔗 رمزي' : '🔗 ربط أجهزتي'}</h2>
             <p className="export-hint">
-              عشان يظهر نفس الرصد على جوالك وكمبيوترك: انسخي الرمز من جهازك
-              الأساسي، وافتحي «رصد» على الجهاز الآخر والصقيه هناك ثم اضغطي «ربط».
-              وإذا كان لك معلّم يتابعك: أرسلي له هذا الرمز نفسه ليضيفك في «👥 طلابي».
+              {user
+                ? 'حسابك يزامن أجهزتك تلقائياً — سجّلي الدخول بنفس الحساب على أي جهاز. وهذا رمزك ترسلينه لمعلّمك ليضيفك في «👥 طلابي».'
+                : 'عشان يظهر نفس الرصد على جوالك وكمبيوترك: انسخي الرمز من جهازك الأساسي، وافتحي «رصد» على الجهاز الآخر والصقيه هناك ثم اضغطي «ربط». وإذا كان لك معلّم يتابعك: أرسلي له هذا الرمز نفسه ليضيفك في «👥 طلابي».'}
             </p>
             <div className="sync-code-box">
-              <code>{getDeviceId()}</code>
+              <code>{user?.id ?? getDeviceId()}</code>
               <button
                 className="nav-btn"
                 onClick={() => {
-                  navigator.clipboard?.writeText(getDeviceId()).then(() => setCopied(true));
+                  navigator.clipboard
+                    ?.writeText(user?.id ?? getDeviceId())
+                    .then(() => setCopied(true));
                 }}
               >
                 {copied ? '✓ نُسخ' : '📋 نسخ الرمز'}
               </button>
             </div>
-            <label className="sync-code-label">
-              الصقي رمز الجهاز الآخر هنا:
-              <input
-                type="text"
-                dir="ltr"
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                value={linkInput}
-                onChange={(e) => setLinkInput(e.target.value)}
-              />
-            </label>
+            {!user && (
+              <label className="sync-code-label">
+                الصقي رمز الجهاز الآخر هنا:
+                <input
+                  type="text"
+                  dir="ltr"
+                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  value={linkInput}
+                  onChange={(e) => setLinkInput(e.target.value)}
+                />
+              </label>
+            )}
             {linkMsg && <p className="export-error">⚠️ {linkMsg}</p>}
             <div className="export-actions">
-              <button
-                className="nav-btn"
-                disabled={!linkInput.trim()}
-                onClick={() => {
-                  const result = adoptSyncCode(linkInput);
-                  if (result === 'invalid') {
-                    setLinkMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
-                    return;
-                  }
-                  if (result === 'same') {
-                    setLinkMsg('هذا رمز جهازك الحالي نفسه');
-                    return;
-                  }
-                  // إعادة تحميل: المزامنة الأولية تدمج رصد الجهازين وترفع الناقص
-                  window.location.reload();
-                }}
-              >
-                🔗 ربط
-              </button>
+              {!user && (
+                <button
+                  className="nav-btn"
+                  disabled={!linkInput.trim()}
+                  onClick={() => {
+                    const result = adoptSyncCode(linkInput);
+                    if (result === 'invalid') {
+                      setLinkMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
+                      return;
+                    }
+                    if (result === 'same') {
+                      setLinkMsg('هذا رمز جهازك الحالي نفسه');
+                      return;
+                    }
+                    // إعادة تحميل: المزامنة الأولية تدمج رصد الجهازين وترفع الناقص
+                    window.location.reload();
+                  }}
+                >
+                  🔗 ربط
+                </button>
+              )}
               <button className="cancel-btn" onClick={() => setLinkOpen(false)}>
                 إغلاق
               </button>
