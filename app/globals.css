@@ -313,6 +313,62 @@ body {
   background: rgba(33, 48, 31, 0.07);
 }
 
+.link-devices-btn {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--paper);
+  background: var(--green);
+  border-radius: 999px;
+  padding: 2px 12px;
+  cursor: pointer;
+}
+
+.link-devices-btn:hover {
+  background: var(--green-deep);
+}
+
+/* صندوق رمز المزامنة */
+.sync-code-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(20, 97, 74, 0.06);
+  border: 1.5px dashed var(--gold-soft);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.sync-code-box code {
+  flex: 1;
+  direction: ltr;
+  text-align: center;
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--green-deep);
+  font-weight: 700;
+}
+
+.sync-code-box .nav-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sync-code-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--green-deep);
+}
+
+.sync-code-label input {
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+}
+
 /* ————— لوحة الطبقات ————— */
 .layers-panel {
   background: var(--paper);

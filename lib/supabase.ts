@@ -11,9 +11,22 @@ export function getDeviceId(): string {
   return id;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// اعتماد رمز مزامنة من جهاز آخر — يصير الجهازان حساباً واحداً
+export function adoptSyncCode(code: string): 'ok' | 'invalid' | 'same' {
+  const v = code.trim().toLowerCase();
+  if (!UUID_RE.test(v)) return 'invalid';
+  if (v === getDeviceId().toLowerCase()) return 'same';
+  localStorage.setItem('rassd:device', v);
+  client = null; // إعادة إنشاء العميل بالترويسة الجديدة
+  return 'ok';
+}
+
 let client: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient | null {
+  if (typeof window === 'undefined') return null; // لا عميل أثناء الرسم على الخادم
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;

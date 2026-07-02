@@ -21,7 +21,14 @@ import {
   type Chapter,
   type PageData,
 } from '@/lib/quran';
-import { deleteRemoteMarks, fetchRemoteMarks, getSupabase, pushMarks } from '@/lib/supabase';
+import {
+  adoptSyncCode,
+  deleteRemoteMarks,
+  fetchRemoteMarks,
+  getDeviceId,
+  getSupabase,
+  pushMarks,
+} from '@/lib/supabase';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -55,6 +62,10 @@ export default function Home() {
   const [exportBusy, setExportBusy] = useState('');
   const [printData, setPrintData] = useState<PageData[] | null>(null);
   const [syncState, setSyncState] = useState<'off' | 'syncing' | 'ok' | 'error'>('off');
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const [linkMsg, setLinkMsg] = useState('');
+  const [copied, setCopied] = useState(false);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
 
@@ -363,6 +374,19 @@ export default function Home() {
           {syncState === 'error' && '⚠️ محلي'}
           {syncState === 'off' && '💾 محلي'}
         </span>
+        {syncState !== 'off' && (
+          <button
+            className="link-devices-btn"
+            onClick={() => {
+              setLinkInput('');
+              setLinkMsg('');
+              setCopied(false);
+              setLinkOpen(true);
+            }}
+          >
+            🔗 أجهزتي
+          </button>
+        )}
       </div>
 
       {/* لوحة الطبقات — كل تاريخ جلسة طبقة مستقلة */}
@@ -541,6 +565,65 @@ export default function Home() {
                 disabled={!!exportBusy}
               >
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة ربط الأجهزة */}
+      {linkOpen && (
+        <div className="export-backdrop" onClick={() => setLinkOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>🔗 ربط أجهزتي</h2>
+            <p className="export-hint">
+              عشان يظهر نفس الرصد على جوالك وكمبيوترك: انسخي الرمز من جهازك
+              الأساسي، وافتحي «رصد» على الجهاز الآخر والصقيه هناك ثم اضغطي «ربط».
+            </p>
+            <div className="sync-code-box">
+              <code>{getDeviceId()}</code>
+              <button
+                className="nav-btn"
+                onClick={() => {
+                  navigator.clipboard?.writeText(getDeviceId()).then(() => setCopied(true));
+                }}
+              >
+                {copied ? '✓ نُسخ' : '📋 نسخ الرمز'}
+              </button>
+            </div>
+            <label className="sync-code-label">
+              الصقي رمز الجهاز الآخر هنا:
+              <input
+                type="text"
+                dir="ltr"
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                value={linkInput}
+                onChange={(e) => setLinkInput(e.target.value)}
+              />
+            </label>
+            {linkMsg && <p className="export-error">⚠️ {linkMsg}</p>}
+            <div className="export-actions">
+              <button
+                className="nav-btn"
+                disabled={!linkInput.trim()}
+                onClick={() => {
+                  const result = adoptSyncCode(linkInput);
+                  if (result === 'invalid') {
+                    setLinkMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
+                    return;
+                  }
+                  if (result === 'same') {
+                    setLinkMsg('هذا رمز جهازك الحالي نفسه');
+                    return;
+                  }
+                  // إعادة تحميل: المزامنة الأولية تدمج رصد الجهازين وترفع الناقص
+                  window.location.reload();
+                }}
+              >
+                🔗 ربط
+              </button>
+              <button className="cancel-btn" onClick={() => setLinkOpen(false)}>
+                إغلاق
               </button>
             </div>
           </div>
