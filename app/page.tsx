@@ -108,6 +108,7 @@ export default function Home() {
   const [otpMsg, setOtpMsg] = useState('');
   const [otpBusy, setOtpBusy] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [wordTexts, setWordTexts] = useState<Map<string, string>>(new Map());
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -160,6 +161,37 @@ export default function Home() {
   const pageMarks = useMemo(() => marksByWord(visibleMarks, page), [visibleMarks, page]);
   const pageErrorCount = useMemo(() => pageMarks.size, [pageMarks]);
   const stats = useMemo(() => computeStats(marks), [marks]);
+
+  // قائمة الأخطاء مجمّعة بالجلسات (الأحدث أولاً) ومرتبة بالصفحة ثم موضع الكلمة
+  const marksByDate = useMemo(() => {
+    const g = new Map<string, ErrorMark[]>();
+    for (const m of marks) {
+      const list = g.get(m.date) ?? [];
+      list.push(m);
+      g.set(m.date, list);
+    }
+    return [...g.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([date, list]) => ({
+        date,
+        list: list.sort(
+          (a, b) => a.page - b.page || a.wordId.localeCompare(b.wordId, undefined, { numeric: true })
+        ),
+      }));
+  }, [marks]);
+
+  // نصوص الكلمات المرصودة: تُجلب صفحاتها عند فتح الإحصاءات
+  useEffect(() => {
+    if (!statsOpen || marks.length === 0) return;
+    const pages = [...new Set(marks.map((m) => m.page))];
+    Promise.all(pages.map(fetchPage)).then((datas) => {
+      const map = new Map<string, string>();
+      for (const d of datas)
+        for (const v of d.verses)
+          for (const w of v.words) if (w.type === 'word') map.set(w.id, w.text);
+      setWordTexts(map);
+    });
+  }, [statsOpen, marks]);
 
   // مزامنة هوية معيّنة مع السحابة: دمج المحلي والسحابي (الأحدث يغلب) ورفع الناقص
   const syncFor = useCallback(async (identity: string, local: ErrorMark[]) => {
@@ -965,6 +997,49 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+
+                {/* قائمة الأخطاء التفصيلية: الكلمة والسورة ورقم الآية */}
+                <h3 className="stats-title">📝 قائمة الأخطاء</h3>
+                {marksByDate.map(({ date, list }) => (
+                  <div key={date} className="error-list-group">
+                    <h4 className="error-list-date">
+                      🗓️ {formatArabicDate(date)} — {arabicWordCount(list.length)}
+                    </h4>
+                    {list.map((m) => {
+                      const [surah, ayah] = m.wordId.split(':');
+                      const t = ERROR_TYPES[m.type];
+                      return (
+                        <div key={`${m.id}@${m.date}`} className="error-item">
+                          <span
+                            className="error-word"
+                            style={{
+                              background: t.bg,
+                              boxShadow: `inset 0 -0.12em 0 0 ${t.color}`,
+                            }}
+                          >
+                            {wordTexts.get(m.wordId) ?? '…'}
+                          </span>
+                          <span className="error-meta">
+                            <b>سورة {chapterMap.get(Number(surah))?.name ?? surah}</b> — آية{' '}
+                            {toArabicDigits(ayah)}
+                            <i className="error-type-tag" style={{ color: t.color }}>
+                              {t.label}
+                            </i>
+                          </span>
+                          <button
+                            className="jump-btn"
+                            onClick={() => {
+                              go(m.page);
+                              setStatsOpen(false);
+                            }}
+                          >
+                            ص {toArabicDigits(m.page)} ↗
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </>
             )}
 
