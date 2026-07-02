@@ -545,6 +545,149 @@ body {
   font-weight: 800;
 }
 
+/* ————— الإحصاءات ————— */
+.stats-dialog {
+  max-width: 440px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.stats-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--green-deep);
+  border-top: 1px dashed var(--gold-soft);
+  padding-top: 10px;
+}
+
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.stat-card {
+  background: rgba(20, 97, 74, 0.06);
+  border: 1px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.stat-card b {
+  font-size: 20px;
+  color: var(--green-deep);
+}
+
+.stat-card span {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.stat-card.warn {
+  background: rgba(192, 57, 43, 0.07);
+}
+
+.stat-card.warn b {
+  color: #c0392b;
+}
+
+.session-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 120px;
+  padding: 4px 2px 0;
+}
+
+.chart-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  min-width: 0;
+}
+
+.chart-count {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--green-deep);
+}
+
+.chart-bar {
+  width: 70%;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, var(--green), var(--green-deep));
+  min-height: 4px;
+}
+
+.chart-label {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.type-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.type-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.type-bar-label {
+  width: 44px;
+}
+
+.type-bar-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(33, 48, 31, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.type-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+
+.type-bar-count {
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.jump-btn {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--paper);
+  background: var(--green);
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.jump-btn:hover {
+  background: var(--green-deep);
+}
+
 /* ————— لوحة الطبقات ————— */
 .layers-panel {
   background: var(--paper);

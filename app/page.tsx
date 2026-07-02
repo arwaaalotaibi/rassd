@@ -24,6 +24,7 @@ import {
   saveStudents,
   type StudentProfile,
 } from '@/lib/profiles';
+import { computeStats } from '@/lib/stats';
 import {
   TOTAL_PAGES,
   toArabicDigits,
@@ -106,6 +107,7 @@ export default function Home() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpMsg, setOtpMsg] = useState('');
   const [otpBusy, setOtpBusy] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const loadSeq = useRef(0);
   const pageWrapRef = useRef<HTMLDivElement>(null);
   const identityRef = useRef(''); // الهوية النشطة: المالكة (حساب أو جهاز) أو الطالب المختار
@@ -157,6 +159,7 @@ export default function Home() {
   );
   const pageMarks = useMemo(() => marksByWord(visibleMarks, page), [visibleMarks, page]);
   const pageErrorCount = useMemo(() => pageMarks.size, [pageMarks]);
+  const stats = useMemo(() => computeStats(marks), [marks]);
 
   // مزامنة هوية معيّنة مع السحابة: دمج المحلي والسحابي (الأحدث يغلب) ورفع الناقص
   const syncFor = useCallback(async (identity: string, local: ErrorMark[]) => {
@@ -582,6 +585,9 @@ export default function Home() {
           >
             📄 تصدير PDF
           </button>
+          <button className="nav-btn" onClick={() => setStatsOpen(true)}>
+            📊 الإحصاءات
+          </button>
         </div>
       </div>
 
@@ -851,6 +857,120 @@ export default function Home() {
                 disabled={!!exportBusy}
               >
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة الإحصاءات */}
+      {statsOpen && (
+        <div className="export-backdrop" onClick={() => setStatsOpen(false)}>
+          <div
+            className="export-dialog controls stats-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>📊 إحصاءات {activeName ?? 'مصحفي'}</h2>
+
+            {stats.totalWords === 0 ? (
+              <p className="layers-empty">
+                لا يوجد رصد بعد — ابدئي التسميع وارصدي الأخطاء وسترين هنا تطوّرك
+                جلسة بعد جلسة.
+              </p>
+            ) : (
+              <>
+                {/* بطاقات سريعة */}
+                <div className="stats-cards">
+                  <div className="stat-card">
+                    <b>{toArabicDigits(stats.sessionsCount)}</b>
+                    <span>جلسات</span>
+                  </div>
+                  <div className="stat-card">
+                    <b>{toArabicDigits(stats.totalWords)}</b>
+                    <span>كلمات مرصودة</span>
+                  </div>
+                  <div className="stat-card">
+                    <b>{toArabicDigits(stats.pagesCount)}</b>
+                    <span>صفحات</span>
+                  </div>
+                  <div className="stat-card warn">
+                    <b>{toArabicDigits(stats.repeatedWords)}</b>
+                    <span>كلمات متكرّرة الخطأ</span>
+                  </div>
+                </div>
+
+                {/* تطوّر الجلسات */}
+                <h3 className="stats-title">تطوّر الجلسات (عدد الأخطاء لكل جلسة)</h3>
+                <div className="session-chart">
+                  {stats.sessions.slice(-12).map((s) => {
+                    const max = Math.max(...stats.sessions.slice(-12).map((x) => x.count));
+                    return (
+                      <div key={s.date} className="chart-col" title={formatArabicDate(s.date)}>
+                        <span className="chart-count">{toArabicDigits(s.count)}</span>
+                        <div
+                          className="chart-bar"
+                          style={{ height: `${Math.max(8, (s.count / max) * 100)}%` }}
+                        />
+                        <span className="chart-label">
+                          {toArabicDigits(s.date.slice(8, 10))}/{toArabicDigits(s.date.slice(5, 7))}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* توزيع الأنواع */}
+                <h3 className="stats-title">توزيع أنواع الأخطاء</h3>
+                <div className="type-bars">
+                  {(Object.keys(ERROR_TYPES) as ErrorType[]).map((k) => {
+                    const total = Object.values(stats.types).reduce((a, b) => a + b, 0);
+                    const pct = total ? Math.round((stats.types[k] / total) * 100) : 0;
+                    return (
+                      <div key={k} className="type-bar-row">
+                        <span className="type-bar-label" style={{ color: ERROR_TYPES[k].color }}>
+                          {ERROR_TYPES[k].label}
+                        </span>
+                        <div className="type-bar-track">
+                          <div
+                            className="type-bar-fill"
+                            style={{ width: `${pct}%`, background: ERROR_TYPES[k].color }}
+                          />
+                        </div>
+                        <span className="type-bar-count">
+                          {toArabicDigits(stats.types[k])} ({toArabicDigits(pct)}٪)
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* أكثر الصفحات أخطاء */}
+                <h3 className="stats-title">أكثر الصفحات أخطاءً</h3>
+                <div className="students-list">
+                  {stats.topPages.map((p) => (
+                    <div key={p.page} className="student-row">
+                      <span className="student-name">صفحة {toArabicDigits(p.page)}</span>
+                      <span className="layer-count">
+                        {toArabicDigits(p.count)} {p.count === 1 ? 'رصد' : 'أرصاد'}
+                      </span>
+                      <button
+                        className="jump-btn"
+                        onClick={() => {
+                          go(p.page);
+                          setStatsOpen(false);
+                        }}
+                      >
+                        فتح ↗
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setStatsOpen(false)}>
+                إغلاق
               </button>
             </div>
           </div>
