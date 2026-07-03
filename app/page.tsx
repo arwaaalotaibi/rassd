@@ -24,7 +24,7 @@ import {
   saveStudents,
   type StudentProfile,
 } from '@/lib/profiles';
-import { RECITERS, ayahAudioUrl, loadReciter, saveReciter } from '@/lib/reciters';
+import { DEFAULT_RECITER, RECITERS, ayahAudioUrl, loadReciter, saveReciter } from '@/lib/reciters';
 import { computeStats } from '@/lib/stats';
 import {
   TOTAL_PAGES,
@@ -147,7 +147,7 @@ export default function Home() {
   } | null>(null);
   const hifzStopRef = useRef(true);
   const pageRef = useRef(1);
-  const [reciter, setReciter] = useState('Alafasy');
+  const [reciter, setReciter] = useState(DEFAULT_RECITER);
   const [liveIdentity, setLiveIdentity] = useState('');
   const liveChannelRef = useRef<ReturnType<
     NonNullable<ReturnType<typeof getSupabase>>['channel']
