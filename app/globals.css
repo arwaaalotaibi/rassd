@@ -1189,6 +1189,37 @@ body {
   background: rgba(20, 97, 74, 0.17);
 }
 
+/* مكرِّر الحفظ */
+.hifz-status {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--green-deep);
+  background: rgba(20, 97, 74, 0.08);
+  border: 1px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 10px;
+  animation: hifz-glow 2s ease-in-out infinite;
+}
+
+@keyframes hifz-glow {
+  0%,
+  100% {
+    background: rgba(20, 97, 74, 0.08);
+  }
+  50% {
+    background: rgba(184, 145, 47, 0.14);
+  }
+}
+
+.stop-btn {
+  background: #c0392b;
+}
+
+.stop-btn:hover {
+  background: #8b2f22;
+}
+
 .remove-btn:hover {
   background: rgba(192, 57, 43, 0.16);
 }

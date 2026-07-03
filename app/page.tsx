@@ -132,6 +132,19 @@ export default function Home() {
   const [shareBusy, setShareBusy] = useState(false);
   const [playingAyah, setPlayingAyah] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [hifzOpen, setHifzOpen] = useState(false);
+  const [hifzSurah, setHifzSurah] = useState(1);
+  const [hifzFrom, setHifzFrom] = useState('1');
+  const [hifzTo, setHifzTo] = useState('1');
+  const [hifzRepeat, setHifzRepeat] = useState('3');
+  const [hifzRounds, setHifzRounds] = useState('1');
+  const [hifzMsg, setHifzMsg] = useState('');
+  const [hifzStatus, setHifzStatus] = useState<{
+    ayah: number;
+    iter: number;
+    round: number;
+  } | null>(null);
+  const hifzStopRef = useRef(true);
   const [liveIdentity, setLiveIdentity] = useState('');
   const liveChannelRef = useRef<ReturnType<
     NonNullable<ReturnType<typeof getSupabase>>['channel']
@@ -751,6 +764,60 @@ export default function Home() {
     }
   };
 
+  // مكرِّر الحفظ: تشغيل نطاق آيات، كل آية تتكرر N مرة، والمجموعة كلها لعدد جولات
+  const stopHifz = useCallback(() => {
+    hifzStopRef.current = true;
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setHifzStatus(null);
+  }, []);
+
+  const startHifz = async () => {
+    const norm = (s: string) =>
+      Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))));
+    const maxAyah = chapterMap.get(hifzSurah)?.verses ?? 286;
+    const from = norm(hifzFrom);
+    const to = norm(hifzTo);
+    const repeat = norm(hifzRepeat);
+    const rounds = norm(hifzRounds);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > maxAyah) {
+      setHifzMsg(`أدخلي آيات بين ١ و${toArabicDigits(maxAyah)}`);
+      return;
+    }
+    if (to < from) {
+      setHifzMsg('آية النهاية قبل آية البداية');
+      return;
+    }
+    if (!Number.isInteger(repeat) || repeat < 1 || repeat > 50 || !Number.isInteger(rounds) || rounds < 1 || rounds > 20) {
+      setHifzMsg('التكرار من ١ إلى ٥٠، والجولات من ١ إلى ٢٠');
+      return;
+    }
+    setHifzMsg('');
+    setPlayingAyah(null);
+    hifzStopRef.current = false;
+    const pad = (n: number) => String(n).padStart(3, '0');
+    outer: for (let round = 1; round <= rounds; round++) {
+      for (let a = from; a <= to; a++) {
+        for (let i = 1; i <= repeat; i++) {
+          if (hifzStopRef.current) break outer;
+          setHifzStatus({ ayah: a, iter: i, round });
+          await new Promise<void>((resolve) => {
+            audioRef.current?.pause();
+            const audio = new Audio(
+              `https://verses.quran.com/Alafasy/mp3/${pad(hifzSurah)}${pad(a)}.mp3`
+            );
+            audioRef.current = audio;
+            audio.onended = () => resolve();
+            audio.onerror = () => resolve();
+            audio.play().catch(() => resolve());
+          });
+        }
+      }
+    }
+    hifzStopRef.current = true;
+    setHifzStatus(null);
+  };
+
   // سماع الآية بصوت العفاسي (CDN تلاوات quran.com المجاني) — ضغطة تشغّل وضغطة توقف
   const toggleAyahAudio = useCallback(
     (surah: number, ayah: number) => {
@@ -892,6 +959,28 @@ export default function Home() {
           </button>
           <button className="nav-btn" onClick={() => setStatsOpen(true)}>
             📊 الإحصاءات
+          </button>
+          <button
+            className="nav-btn"
+            onClick={() => {
+              // تعبئة افتراضية من آيات الصفحة الحالية
+              const first = data?.verses[0];
+              const last = data?.verses[data.verses.length - 1];
+              if (first) {
+                const [s, a1] = first.key.split(':').map(Number);
+                setHifzSurah(s);
+                setHifzFrom(String(a1));
+                const sameSurah = data!.verses.filter((v) => v.chapter === s);
+                const a2 = Number(sameSurah[sameSurah.length - 1].key.split(':')[1]);
+                setHifzTo(String(a2));
+              } else if (last) {
+                setHifzSurah(last.chapter);
+              }
+              setHifzMsg('');
+              setHifzOpen(true);
+            }}
+          >
+            🎧 الحفظ
           </button>
         </div>
       </div>
@@ -1180,6 +1269,111 @@ export default function Home() {
                 disabled={!!exportBusy}
               >
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* مكرِّر الحفظ */}
+      {hifzOpen && (
+        <div
+          className="export-backdrop"
+          onClick={() => {
+            stopHifz();
+            setHifzOpen(false);
+          }}
+        >
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>🎧 مكرِّر الحفظ</h2>
+            <p className="export-hint">
+              اختاري الآيات وعدد التكرار، واتركي التلاوة تعيد عليك — كل آية تتكرر
+              العدد المحدّد، ثم تنتقل للتي بعدها، والمجموعة كلها تُعاد بعدد الجولات.
+            </p>
+            <label className="sync-code-label">
+              السورة:
+              <select
+                value={hifzSurah}
+                onChange={(e) => {
+                  setHifzSurah(Number(e.target.value));
+                  setHifzFrom('1');
+                  setHifzTo('1');
+                }}
+              >
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {toArabicDigits(c.id)}. {c.name} ({toArabicDigits(c.verses)} آية)
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="export-range">
+              <label>
+                من آية
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={hifzFrom}
+                  onChange={(e) => setHifzFrom(e.target.value)}
+                />
+              </label>
+              <label>
+                إلى آية
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={hifzTo}
+                  onChange={(e) => setHifzTo(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="export-range">
+              <label>
+                تكرار كل آية
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={hifzRepeat}
+                  onChange={(e) => setHifzRepeat(e.target.value)}
+                />
+              </label>
+              <label>
+                جولات المجموعة
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={hifzRounds}
+                  onChange={(e) => setHifzRounds(e.target.value)}
+                />
+              </label>
+            </div>
+            {hifzMsg && <p className="export-error">⚠️ {hifzMsg}</p>}
+            {hifzStatus && (
+              <p className="hifz-status">
+                ▶️ الآية {toArabicDigits(hifzStatus.ayah)} — التكرار{' '}
+                {toArabicDigits(hifzStatus.iter)}/{toArabicDigits(Number(hifzRepeat) || 1)}
+                {Number(hifzRounds) > 1 &&
+                  ` — الجولة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`}
+              </p>
+            )}
+            <div className="export-actions">
+              {hifzStatus ? (
+                <button className="nav-btn stop-btn" onClick={stopHifz}>
+                  ⏹ إيقاف
+                </button>
+              ) : (
+                <button className="nav-btn" onClick={startHifz}>
+                  ▶️ ابدئي التلاوة
+                </button>
+              )}
+              <button
+                className="cancel-btn"
+                onClick={() => {
+                  stopHifz();
+                  setHifzOpen(false);
+                }}
+              >
+                إغلاق
               </button>
             </div>
           </div>
