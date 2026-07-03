@@ -714,14 +714,25 @@ export default function Home() {
       const w = Math.ceil(host.getBoundingClientRect().width);
       const h = Math.ceil(host.getBoundingClientRect().height);
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(host, {
+      const opts = {
         pixelRatio: 3,
         width: w,
         height: h,
         canvasWidth: w * 3,
         canvasHeight: h * 3,
-        style: { margin: '0', left: '0', top: '0', transform: 'none' },
-      });
+        backgroundColor: '#ffffff', // لا شفافية — الشفاف يظهر أسود في بعض التطبيقات
+        // نلغي التثبيت على النسخة المصوَّرة حتى لا يضيع المحتوى خارج الكادر
+        style: {
+          position: 'static' as const,
+          margin: '0',
+          left: 'auto',
+          top: 'auto',
+          transform: 'none',
+        },
+      };
+      // سفاري/iOS يعيد أول التقاط فارغاً أحياناً — نلتقط ثلاث مرات ونعتمد الأخيرة
+      let dataUrl = '';
+      for (let i = 0; i < 3; i++) dataUrl = await toPng(host, opts);
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], 'rassd-report.png', { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
