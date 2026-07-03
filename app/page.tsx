@@ -27,9 +27,12 @@ import {
 import { DEFAULT_RECITER, RECITERS, ayahAudioUrl, loadReciter, saveReciter } from '@/lib/reciters';
 import { computeStats } from '@/lib/stats';
 import {
-  TOTAL_PAGES,
+  LAYOUTS,
+  loadLayout,
+  saveLayout,
   toArabicDigits,
   type Chapter,
+  type LayoutId,
   type PageData,
 } from '@/lib/quran';
 import {
@@ -56,14 +59,15 @@ import type { User } from '@supabase/supabase-js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const pageCache = new Map<number, PageData>();
+const pageCache = new Map<string, PageData>();
 
-async function fetchPage(p: number): Promise<PageData> {
-  const cached = pageCache.get(p);
+async function fetchLayoutPage(dir: string, p: number): Promise<PageData> {
+  const key = `${dir}:${p}`;
+  const cached = pageCache.get(key);
   if (cached) return cached;
-  const res = await fetch(`/quran/pages/${p}.json`);
+  const res = await fetch(`/quran/${dir}/${p}.json`);
   const data: PageData = await res.json();
-  pageCache.set(p, data);
+  pageCache.set(key, data);
   return data;
 }
 
@@ -147,6 +151,30 @@ export default function Home() {
   } | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
+  const [layoutId, setLayoutId] = useState<LayoutId>('madani');
+  const [layoutChapters, setLayoutChapters] = useState<Record<
+    string,
+    [number, number]
+  > | null>(null);
+  const [mushafOpen, setMushafOpen] = useState(false);
+
+  const layoutCfg = LAYOUTS[layoutId];
+  const totalPages = layoutCfg.totalPages;
+  const fetchPage = useCallback(
+    (p: number) => fetchLayoutPage(layoutCfg.dir, p),
+    [layoutCfg.dir]
+  );
+
+  // فهرس سور المخطط غير المدني (سورة → [أول صفحة، آخرها])
+  useEffect(() => {
+    if (layoutId === 'madani') {
+      setLayoutChapters(null);
+      return;
+    }
+    fetch(`/quran/${LAYOUTS[layoutId].dir}/chapters.json`)
+      .then((r) => r.json())
+      .then(setLayoutChapters);
+  }, [layoutId]);
   const hifzStopRef = useRef(true);
   const pageRef = useRef(1);
   const [reciter, setReciter] = useState(DEFAULT_RECITER);
@@ -325,8 +353,10 @@ export default function Home() {
 
   // استرجاع آخر صفحة + الملفات + الحساب + تحميل أسماء السور
   useEffect(() => {
+    const lay = loadLayout();
+    setLayoutId(lay);
     const saved = Number(localStorage.getItem('rassd:page'));
-    if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
+    if (saved >= 1 && saved <= LAYOUTS[lay].totalPages) setPage(saved);
     setReciter(loadReciter());
     fetch('/quran/chapters.json')
       .then((r) => r.json())
@@ -457,15 +487,18 @@ export default function Home() {
     fetchPage(page).then((d) => {
       if (loadSeq.current === seq) setData(d);
     });
-    if (page < TOTAL_PAGES) fetchPage(page + 1);
+    if (page < totalPages) fetchPage(page + 1);
     if (page > 1) fetchPage(page - 1);
     pageRef.current = page;
     localStorage.setItem('rassd:page', String(page));
-  }, [page]);
+  }, [page, fetchPage]);
 
-  const go = useCallback((p: number) => {
-    if (p >= 1 && p <= TOTAL_PAGES) setPage(p);
-  }, []);
+  const go = useCallback(
+    (p: number) => {
+      if (p >= 1 && p <= totalPages) setPage(p);
+    },
+    [totalPages]
+  );
 
   // أسهم الكيبورد: اليسار = الصفحة التالية (اتجاه المصحف)
   useEffect(() => {
@@ -575,8 +608,8 @@ export default function Home() {
   const doExport = async () => {
     const from = exportFrom ? Number(normalizeDigits(exportFrom)) : page;
     const to = exportTo ? Number(normalizeDigits(exportTo)) : from;
-    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > TOTAL_PAGES) {
-      setExportErr(`أدخلي أرقام صفحات بين ١ و${toArabicDigits(TOTAL_PAGES)}`);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > totalPages) {
+      setExportErr(`أدخلي أرقام صفحات بين ١ و${toArabicDigits(totalPages)}`);
       return;
     }
     if (to < from) {
@@ -776,14 +809,52 @@ export default function Home() {
     async (surah: number, ayah: number): Promise<number | null> => {
       const c = chapterMap.get(surah);
       if (!c) return null;
+      const range =
+        layoutId === 'madani' ? c.pages : layoutChapters?.[String(surah)];
+      if (!range) return null;
       const key = `${surah}:${ayah}`;
-      for (let p = c.pages[0]; p <= c.pages[1]; p++) {
+      for (let p = range[0]; p <= range[1]; p++) {
         const d = await fetchPage(p);
         if (d.verses.some((v) => v.key === key)) return p;
       }
       return null;
     },
-    [chapterMap]
+    [chapterMap, layoutId, layoutChapters, fetchPage]
+  );
+
+  // تبديل المصحف مع البقاء في نفس الموضع: نبحث عن صفحة أول آية ظاهرة في المخطط الجديد
+  const switchLayout = useCallback(
+    async (id: LayoutId) => {
+      setMushafOpen(false);
+      if (id === layoutId) return;
+      const anchor = data?.verses[0]?.key ?? null;
+      saveLayout(id);
+      setLayoutId(id);
+      const cfg = LAYOUTS[id];
+      let target = Math.min(page, cfg.totalPages);
+      if (anchor) {
+        const [s] = anchor.split(':').map(Number);
+        let range: [number, number] | undefined;
+        if (id === 'madani') range = chapterMap.get(s)?.pages;
+        else {
+          try {
+            const ch = await fetch(`/quran/${cfg.dir}/chapters.json`).then((r) => r.json());
+            range = ch[String(s)];
+          } catch {}
+        }
+        if (range) {
+          for (let p = range[0]; p <= range[1]; p++) {
+            const d = await fetchLayoutPage(cfg.dir, p);
+            if (d.verses.some((v) => v.key === anchor)) {
+              target = p;
+              break;
+            }
+          }
+        }
+      }
+      setPage(target);
+    },
+    [layoutId, data, page, chapterMap]
   );
 
   // مكرِّر الحفظ: تشغيل نطاق آيات، كل آية تتكرر N مرة، والمجموعة كلها لعدد جولات
@@ -901,7 +972,7 @@ export default function Home() {
     // تطبيع الأرقام العربية قبل التحقق
     const normalized = pageInput.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
     const n = Number(normalized);
-    if (Number.isInteger(n) && n >= 1 && n <= TOTAL_PAGES) go(n);
+    if (Number.isInteger(n) && n >= 1 && n <= totalPages) go(n);
     setPageInput('');
   };
 
@@ -966,7 +1037,12 @@ export default function Home() {
           value={currentChapter}
           onChange={(e) => {
             const c = chapterMap.get(Number(e.target.value));
-            if (c) go(c.pages[0]);
+            if (!c) return;
+            const start =
+              layoutId === 'madani'
+                ? c.pages[0]
+                : layoutChapters?.[String(c.id)]?.[0] ?? 1;
+            go(start);
           }}
           className="flex-1 min-w-36"
           aria-label="اختيار السورة"
@@ -981,7 +1057,7 @@ export default function Home() {
         <input
           type="text"
           inputMode="numeric"
-          placeholder={`صفحة ١-${toArabicDigits(TOTAL_PAGES)}`}
+          placeholder={`صفحة ١-${toArabicDigits(totalPages)}`}
           value={pageInput}
           onChange={(e) => setPageInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submitPageInput()}
@@ -994,7 +1070,7 @@ export default function Home() {
           <button className="nav-btn" onClick={() => go(page - 1)} disabled={page <= 1}>
             ▶ السابقة
           </button>
-          <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= TOTAL_PAGES}>
+          <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= totalPages}>
             التالية ◀
           </button>
         </div>
@@ -1037,6 +1113,9 @@ export default function Home() {
         </button>
         <button className="tool-btn" onClick={() => setStatsOpen(true)}>
           📊 الإحصاءات
+        </button>
+        <button className="tool-btn" onClick={() => setMushafOpen(true)}>
+          📖 المصحف
         </button>
       </div>
 
@@ -1195,6 +1274,7 @@ export default function Home() {
             marks={pageMarks}
             onWordClick={onWordClick}
             activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : null}
+            layout={layoutId}
           />
         ) : (
           <div
@@ -1382,6 +1462,53 @@ export default function Home() {
                 disabled={!!exportBusy}
               >
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* اختيار نوع المصحف — التعرف على مصحف الطالبة ببصمة الصفحة ٣٠٠ */}
+      {mushafOpen && (
+        <div className="export-backdrop" onClick={() => setMushafOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>📖 نوع المصحف</h2>
+            <p className="export-hint">
+              ما تعرفين أي مصحف عند الطالبة؟ اطلبي منها تفتح مصحفها الورقي على
+              <b> الصفحة ٣٠٠ </b>
+              وتقارن أول كلماتها بالبطاقات — كل مصحف يبدأ بكلمات مختلفة:
+            </p>
+            {(Object.values(LAYOUTS) as (typeof LAYOUTS)[LayoutId][]).map((l) => (
+              <button
+                key={l.id}
+                className={`mushaf-choice ${l.id === layoutId ? 'active' : ''}`}
+                onClick={() => switchLayout(l.id)}
+              >
+                <span className="mushaf-choice-head">
+                  <b>{l.name}</b>
+                  {l.id === layoutId && <em>✓ الحالي</em>}
+                </span>
+                <span className="mushaf-choice-meta">
+                  {toArabicDigits(l.totalPages)} صفحة · {toArabicDigits(l.lines)} سطراً في
+                  الصفحة
+                </span>
+                <span
+                  className={`mushaf-choice-sample ${l.font === 'indopak' ? 'font-indopak' : 'font-uthmani'}`}
+                >
+                  {l.sampleWords}
+                </span>
+                <span className="mushaf-choice-ref">
+                  أول صفحة ٣٠٠ — {l.sampleRef}
+                </span>
+              </button>
+            ))}
+            <p className="export-hint dim-hint">
+              رصد الأخطاء واحد مهما كان المصحف — العلامات على الكلمات نفسها تظهر
+              في أي مخطط تختارينه، وفقط أرقام الصفحات تختلف.
+            </p>
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setMushafOpen(false)}>
+                إغلاق
               </button>
             </div>
           </div>

@@ -3,10 +3,12 @@
 import { ERROR_TYPES, type ErrorMark } from '@/lib/errors';
 import {
   BASMALA,
+  LAYOUTS,
   buildLines,
   juzOfPage,
   toArabicDigits,
   type Chapter,
+  type LayoutId,
   type PageData,
 } from '@/lib/quran';
 import { useMemo, type CSSProperties } from 'react';
@@ -17,6 +19,7 @@ type Props = {
   marks?: Map<string, ErrorMark[]>;
   onWordClick?: (wordId: string, el: HTMLElement) => void;
   activeVerse?: string | null; // "سورة:آية" — الآية التي تُتلى الآن (مكرِّر الحفظ)
+  layout?: LayoutId;
 };
 
 export default function MushafPage({
@@ -25,19 +28,25 @@ export default function MushafPage({
   marks,
   onWordClick,
   activeVerse,
+  layout = 'madani',
 }: Props) {
-  const lines = useMemo(() => buildLines(data), [data]);
+  const layoutCfg = LAYOUTS[layout];
+  const lines = useMemo(() => buildLines(data, layoutCfg.lines), [data, layoutCfg.lines]);
   const ornate = data.page <= 2; // الفاتحة وبداية البقرة بتنسيق مزخرف مُوسَّط
   const firstChapter = data.verses[0]?.chapter;
   const surahName = firstChapter ? chapters.get(firstChapter)?.name ?? '' : '';
+  const juz = data.juz ?? (layout === 'madani' ? juzOfPage(data.page) : null);
 
   return (
     <div className="mushaf-frame w-full">
       <div className="mushaf-frame-inner">
-        <div className={`mushaf-page ${ornate ? 'ornate' : ''}`} style={{ aspectRatio: '0.68' }}>
+        <div
+          className={`mushaf-page ${ornate ? 'ornate' : ''} ${layoutCfg.font === 'indopak' ? 'indopak' : ''}`}
+          style={{ aspectRatio: '0.68' }}
+        >
           <div className="page-meta">
             <span>سورة {surahName}</span>
-            <span>الجزء {toArabicDigits(juzOfPage(data.page))}</span>
+            <span>{juz ? `الجزء ${toArabicDigits(juz)}` : LAYOUTS[layout].short}</span>
           </div>
 
           <div className="mushaf-lines">

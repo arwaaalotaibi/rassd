@@ -13,7 +13,70 @@ export type Verse = {
   words: Word[];
 };
 
-export type PageData = { page: number; verses: Verse[] };
+export type PageData = { page: number; juz?: number | null; verses: Verse[] };
+
+// ————— مخططات المصاحف —————
+export type LayoutId = 'madani' | 'indopak15' | 'indopak16';
+
+export type MushafLayout = {
+  id: LayoutId;
+  name: string;
+  short: string;
+  totalPages: number;
+  lines: number;
+  dir: string; // مجلد الصفحات داخل public/quran
+  font: 'uthmani' | 'indopak';
+  // بصمة التمييز: أول كلمات الصفحة ٣٠٠ في المصحف الورقي
+  sampleWords: string;
+  sampleRef: string;
+};
+
+export const LAYOUTS: Record<LayoutId, MushafLayout> = {
+  madani: {
+    id: 'madani',
+    name: 'مصحف المدينة النبوية',
+    short: 'المدينة',
+    totalPages: 604,
+    lines: 15,
+    dir: 'pages',
+    font: 'uthmani',
+    sampleWords: 'وَلَقَدۡ صَرَّفۡنَا فِي هَٰذَا',
+    sampleRef: 'الكهف ٥٤',
+  },
+  indopak15: {
+    id: 'indopak15',
+    name: 'المصحف الباكستاني — ١٥ سطراً',
+    short: 'باكستاني ١٥',
+    totalPages: 610,
+    lines: 15,
+    dir: 'indopak15',
+    font: 'indopak',
+    sampleWords: 'وَمَا مَنَعَ النَّاسَ اَنۡ',
+    sampleRef: 'الكهف ٥٥',
+  },
+  indopak16: {
+    id: 'indopak16',
+    name: 'المصحف الباكستاني — ١٦ سطراً',
+    short: 'باكستاني ١٦',
+    totalPages: 548,
+    lines: 16,
+    dir: 'indopak16',
+    font: 'indopak',
+    sampleWords: 'ذٰلِكَ بِاَنَّ اللّٰهَ هُوَ',
+    sampleRef: 'الحج ٦',
+  },
+};
+
+export const DEFAULT_LAYOUT: LayoutId = 'madani';
+
+export function loadLayout(): LayoutId {
+  const saved = localStorage.getItem('rassd:layout');
+  return saved && saved in LAYOUTS ? (saved as LayoutId) : DEFAULT_LAYOUT;
+}
+
+export function saveLayout(id: LayoutId) {
+  localStorage.setItem('rassd:layout', id);
+}
 
 export type Chapter = {
   id: number;
@@ -51,14 +114,14 @@ export function toArabicDigits(n: number | string): string {
   return String(n).replace(/\d/g, (d) => ARABIC_DIGITS[Number(d)]);
 }
 
-// يبني أسطر الصفحة الـ١٥ من الكلمات، ويحقن رؤوس السور والبسملة في الأسطر الفارغة
-export function buildLines(data: PageData): LineSlot[] {
-  const slots: LineSlot[] = Array.from({ length: LINES_PER_PAGE }, () => ({ kind: 'empty' }));
+// يبني أسطر الصفحة من الكلمات، ويحقن رؤوس السور والبسملة في الأسطر الفارغة
+export function buildLines(data: PageData, linesPerPage: number = LINES_PER_PAGE): LineSlot[] {
+  const slots: LineSlot[] = Array.from({ length: linesPerPage }, () => ({ kind: 'empty' }));
 
   for (const verse of data.verses) {
     for (const w of verse.words) {
       const idx = w.line - 1;
-      if (idx < 0 || idx >= LINES_PER_PAGE) continue;
+      if (idx < 0 || idx >= linesPerPage) continue;
       let slot = slots[idx];
       if (slot.kind !== 'words') {
         slot = { kind: 'words', words: [] };
