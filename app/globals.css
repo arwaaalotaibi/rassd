@@ -1189,6 +1189,35 @@ body {
   background: rgba(20, 97, 74, 0.17);
 }
 
+/* ————— شريط الأدوات ————— */
+.tools-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.tool-btn {
+  flex: 1;
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 9px 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--green-deep);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.tool-btn:hover {
+  background: rgba(20, 97, 74, 0.08);
+  border-color: var(--gold);
+}
+
+.tool-btn:active {
+  transform: scale(0.97);
+}
+
 /* مكرِّر الحفظ */
 /* الآية التي تُتلى الآن — توهّج ذهبي فوق أي تظليل رصد */
 .word.reciting,

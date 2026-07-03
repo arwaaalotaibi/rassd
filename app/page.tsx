@@ -966,43 +966,47 @@ export default function Home() {
           <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= TOTAL_PAGES}>
             التالية ◀
           </button>
-          <button
-            className="nav-btn export-btn"
-            onClick={() => {
-              setExportFrom(String(page));
-              setExportTo(String(page));
-              setExportErr('');
-              setExportOpen(true);
-            }}
-          >
-            📄 تصدير PDF
-          </button>
-          <button className="nav-btn" onClick={() => setStatsOpen(true)}>
-            📊 الإحصاءات
-          </button>
-          <button
-            className="nav-btn"
-            onClick={() => {
-              // تعبئة افتراضية من آيات الصفحة الحالية
-              const first = data?.verses[0];
-              const last = data?.verses[data.verses.length - 1];
-              if (first) {
-                const [s, a1] = first.key.split(':').map(Number);
-                setHifzSurah(s);
-                setHifzFrom(String(a1));
-                const sameSurah = data!.verses.filter((v) => v.chapter === s);
-                const a2 = Number(sameSurah[sameSurah.length - 1].key.split(':')[1]);
-                setHifzTo(String(a2));
-              } else if (last) {
-                setHifzSurah(last.chapter);
-              }
-              setHifzMsg('');
-              setHifzOpen(true);
-            }}
-          >
-            🎧 الحفظ
-          </button>
         </div>
+      </div>
+
+      {/* شريط الأدوات: الاستماع والتصدير والإحصاءات بأزرار متساوية */}
+      <div className="tools-bar w-full max-w-xl">
+        <button
+          className="tool-btn"
+          onClick={() => {
+            // تعبئة افتراضية من آيات الصفحة الحالية
+            const first = data?.verses[0];
+            const last = data?.verses[data.verses.length - 1];
+            if (first) {
+              const [s, a1] = first.key.split(':').map(Number);
+              setHifzSurah(s);
+              setHifzFrom(String(a1));
+              const sameSurah = data!.verses.filter((v) => v.chapter === s);
+              const a2 = Number(sameSurah[sameSurah.length - 1].key.split(':')[1]);
+              setHifzTo(String(a2));
+            } else if (last) {
+              setHifzSurah(last.chapter);
+            }
+            setHifzMsg('');
+            setHifzOpen(true);
+          }}
+        >
+          🎧 الاستماع
+        </button>
+        <button
+          className="tool-btn"
+          onClick={() => {
+            setExportFrom(String(page));
+            setExportTo(String(page));
+            setExportErr('');
+            setExportOpen(true);
+          }}
+        >
+          📄 تصدير PDF
+        </button>
+        <button className="tool-btn" onClick={() => setStatsOpen(true)}>
+          📊 الإحصاءات
+        </button>
       </div>
 
       {/* شريط الملفات: أرصد في مصحفي أو مصحف أحد طلابي */}
@@ -1325,7 +1329,7 @@ export default function Home() {
           }}
         >
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
-            <h2>🎧 مكرِّر الحفظ</h2>
+            <h2>🎧 الاستماع والتكرار</h2>
             <p className="export-hint">
               اختاري الآيات وعدد التكرار، واتركي التلاوة تعيد عليك — كل آية تتكرر
               العدد المحدّد ثم تنتقل للتي بعدها، والمقطع كاملاً يُعاد بالعدد الذي
