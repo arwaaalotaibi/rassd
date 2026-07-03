@@ -145,6 +145,8 @@ export default function Home() {
     iter: number;
     round: number;
   } | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteSaved, setNoteSaved] = useState(false);
   const hifzStopRef = useRef(true);
   const pageRef = useRef(1);
   const [reciter, setReciter] = useState(DEFAULT_RECITER);
@@ -866,6 +868,35 @@ export default function Home() {
   const popoverMarks = popover ? pageMarks.get(popover.wordId) ?? [] : [];
   const sessionMark = popoverMarks.find((m) => m.date === sessionDate);
 
+  // مسودة الملاحظة تتبع الكلمة المفتوحة: تعبّأ بملاحظة جلسة اليوم إن وُجدت
+  useEffect(() => {
+    setNoteDraft(sessionMark?.note ?? '');
+    setNoteSaved(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [popover?.wordId, sessionDate]);
+
+  const saveNote = () => {
+    if (!popover || !sessionMark) return;
+    const next = upsertMark(
+      marks,
+      popover.wordId,
+      page,
+      sessionMark.type,
+      sessionDate,
+      noteDraft.trim()
+    );
+    updateMarks(next);
+    setNoteSaved(true);
+    const saved = next.find((m) => m.id === `${popover.wordId}@${sessionDate}`);
+    if (saved && getSupabase()) {
+      setSyncState('syncing');
+      pushMarks(identityRef.current, [saved]).then((ok) => {
+        setSyncState(ok ? 'ok' : 'error');
+        if (ok) broadcastChange();
+      });
+    }
+  };
+
   const submitPageInput = () => {
     // تطبيع الأرقام العربية قبل التحقق
     const normalized = pageInput.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
@@ -1193,7 +1224,14 @@ export default function Home() {
                     className={`type-btn ${sessionMark?.type === k ? 'active' : ''}`}
                     style={{ background: ERROR_TYPES[k].bg, color: ERROR_TYPES[k].color }}
                     onClick={() => {
-                      const next = upsertMark(marks, popover.wordId, page, k, sessionDate);
+                      const next = upsertMark(
+                        marks,
+                        popover.wordId,
+                        page,
+                        k,
+                        sessionDate,
+                        sessionMark?.note ?? ''
+                      );
                       updateMarks(next);
                       const added = next.find((m) => m.id === `${popover.wordId}@${sessionDate}`);
                       if (added && getSupabase()) {
@@ -1216,6 +1254,37 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              {/* ملاحظات الجلسات السابقة على هذه الكلمة — بطاقات للقراءة */}
+              {popoverMarks
+                .filter((m) => m.note && m.date !== sessionDate)
+                .map((m) => (
+                  <div key={m.id} className="teacher-note">
+                    <span className="teacher-note-text">💬 {m.note}</span>
+                    <span className="teacher-note-date">{formatArabicDate(m.date)}</span>
+                  </div>
+                ))}
+
+              {/* كتابة/تعديل ملاحظة جلسة اليوم — تظهر بعد تحديد نوع الخطأ */}
+              {sessionMark && (
+                <div className="note-editor">
+                  <textarea
+                    className="note-input"
+                    rows={2}
+                    placeholder="💬 ملاحظة للطالب… (مثال: مدّ لازم ٦ حركات)"
+                    value={noteDraft}
+                    onChange={(e) => {
+                      setNoteDraft(e.target.value);
+                      setNoteSaved(false);
+                    }}
+                  />
+                  {(noteDraft.trim() !== (sessionMark.note ?? '') || noteSaved) && (
+                    <button className="note-save-btn" onClick={saveNote} disabled={noteSaved}>
+                      {noteSaved ? '✓ حُفظت الملاحظة' : '💾 حفظ الملاحظة'}
+                    </button>
+                  )}
+                </div>
+              )}
+
               <button
                 className="listen-btn"
                 onClick={() => {
@@ -1613,6 +1682,7 @@ export default function Home() {
                             <i className="error-type-tag" style={{ color: t.color }}>
                               {t.label}
                             </i>
+                            {m.note && <span className="error-note">💬 {m.note}</span>}
                           </span>
                           <button
                             className="jump-btn"

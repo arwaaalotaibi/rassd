@@ -184,6 +184,7 @@ type Row = {
   type: ErrorType;
   date: string;
   created_at: string;
+  note?: string;
 };
 
 function rowToMark(r: Row): ErrorMark {
@@ -194,6 +195,7 @@ function rowToMark(r: Row): ErrorMark {
     type: r.type,
     date: r.date,
     createdAt: new Date(r.created_at).getTime(),
+    note: r.note ?? '',
   };
 }
 
@@ -232,6 +234,7 @@ export async function pushMarks(identity: string, marks: ErrorMark[]): Promise<b
     type: m.type,
     date: m.date,
     created_at: new Date(m.createdAt).toISOString(),
+    note: m.note ?? '',
   }));
   const { error } = await sb
     .from('error_marks')

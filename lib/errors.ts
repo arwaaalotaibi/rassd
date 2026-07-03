@@ -19,6 +19,7 @@ export type ErrorMark = {
   type: ErrorType;
   date: string; // "YYYY-MM-DD" — تاريخ جلسة التسميع (أساس الطبقات)
   createdAt: number;
+  note?: string; // ملاحظة المعلّم على الخطأ
 };
 
 const STORAGE_PREFIX = 'rassd:errors:v1';
@@ -66,7 +67,8 @@ export function upsertMark(
   wordId: string,
   page: number,
   type: ErrorType,
-  date: string
+  date: string,
+  note = ''
 ): ErrorMark[] {
   const rest = marks.filter((m) => !(m.wordId === wordId && m.date === date));
   return [
@@ -78,6 +80,7 @@ export function upsertMark(
       type,
       date,
       createdAt: Date.now(),
+      note,
     },
   ];
 }

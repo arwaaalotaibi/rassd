@@ -76,10 +76,11 @@ export default function MushafPage({
                     const wordMarks = marks?.get(w.id);
                     const last = wordMarks?.[wordMarks.length - 1];
                     const t = last ? ERROR_TYPES[last.type] : null;
+                    const hasNote = wordMarks?.some((m) => m.note) ?? false;
                     return (
                       <span
                         key={w.id}
-                        className={`word ${t ? 'marked' : ''} ${reciting ? 'reciting' : ''}`}
+                        className={`word ${t ? 'marked' : ''} ${reciting ? 'reciting' : ''} ${hasNote ? 'has-note' : ''}`}
                         style={
                           t
                             ? ({ '--mark-color': t.color, '--mark-bg': t.bg } as CSSProperties)

@@ -1189,6 +1189,110 @@ body {
   background: rgba(20, 97, 74, 0.17);
 }
 
+/* ————— ملاحظات المعلّم ————— */
+/* شارة صغيرة على الكلمة التي عليها ملاحظة */
+.word.has-note {
+  position: relative;
+}
+
+.word.has-note::after {
+  content: '';
+  position: absolute;
+  top: -0.1em;
+  inset-inline-end: -0.15em;
+  width: 0.32em;
+  height: 0.32em;
+  border-radius: 999px;
+  background: var(--gold);
+  box-shadow: 0 0 0 1.5px var(--paper);
+}
+
+/* بطاقة الملاحظة — ورقة ذهبية دافئة بذيل فقاعة */
+.teacher-note {
+  position: relative;
+  background: linear-gradient(160deg, #fdf3d7, #f7e7b5);
+  border: 1.5px solid var(--gold);
+  border-radius: 12px 12px 12px 3px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 3px 10px rgba(184, 145, 47, 0.25);
+}
+
+.teacher-note-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b4f10;
+  line-height: 1.7;
+}
+
+.teacher-note-date {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a3812e;
+  text-align: end;
+}
+
+/* محرر الملاحظة داخل نافذة الكلمة */
+.note-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-input {
+  width: 100%;
+  background: linear-gradient(160deg, #fefaf0, #faf1d9);
+  border: 1.5px dashed var(--gold-soft);
+  border-radius: 10px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--ink);
+  outline: none;
+  resize: none;
+  line-height: 1.7;
+}
+
+.note-input:focus {
+  border-color: var(--gold);
+  border-style: solid;
+}
+
+.note-save-btn {
+  align-self: flex-end;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--paper);
+  background: var(--gold);
+  border-radius: 999px;
+  padding: 4px 14px;
+  cursor: pointer;
+}
+
+.note-save-btn:hover {
+  background: #a3812e;
+}
+
+.note-save-btn:disabled {
+  background: var(--green);
+  cursor: default;
+}
+
+/* الملاحظة داخل قائمة الأخطاء */
+.error-note {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #6b4f10;
+  background: rgba(184, 145, 47, 0.12);
+  border-inline-start: 3px solid var(--gold);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
 /* ————— شريط الأدوات ————— */
 .tools-bar {
   display: flex;
