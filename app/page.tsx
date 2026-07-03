@@ -392,6 +392,11 @@ export default function Home() {
     const st = loadStudents();
     setStudents(st);
 
+    // تسجيل عامل الخدمة للعمل بدون إنترنت (PWA)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
     const boot = async () => {
       const sessionUser = await getSessionUser();
       setUser(sessionUser);
