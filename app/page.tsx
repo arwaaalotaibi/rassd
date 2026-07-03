@@ -2184,6 +2184,7 @@ export default function Home() {
                               <i className="error-type-tag" style={{ color: t.color }}>
                                 {t.label}
                               </i>
+                              {e.m.note && <span className="error-note">💬 {e.m.note}</span>}
                             </span>
                             <span className="error-meta-page">صفحة {toArabicDigits(e.m.page)}</span>
                           </div>

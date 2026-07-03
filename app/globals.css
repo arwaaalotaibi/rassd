@@ -953,6 +953,10 @@ body {
   font-size: 15px;
 }
 
+.print-list-rows .error-note {
+  font-size: 13.5px;
+}
+
 .error-meta-page {
   font-size: 13px;
   font-weight: 700;
