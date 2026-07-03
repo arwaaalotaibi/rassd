@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 type FeedbackItem = {
   id: number;
   message: string;
-  contact: string;
+  reply: string;
   device_id: string;
   at: string;
 };
@@ -39,6 +39,7 @@ export default function AdminPage() {
   const [deleteId, setDeleteId] = useState('');
   const [deleteMsg, setDeleteMsg] = useState('');
   const [inbox, setInbox] = useState<FeedbackItem[]>([]);
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
 
   const loadInbox = () => {
     getSupabase()
@@ -243,10 +244,10 @@ export default function AdminPage() {
                 <p className="feedback-message">{f.message}</p>
                 <div className="feedback-meta">
                   <span>🗓 {toArabicDigits(f.at)}</span>
-                  {f.contact && <span dir="ltr">📞 {f.contact}</span>}
                   <span dir="ltr" className="feedback-sender">
                     {f.device_id.slice(0, 8)}…
                   </span>
+                  {f.reply && <span>✅ تم الرد</span>}
                   <button
                     className="student-remove"
                     title="حذف الملاحظة"
@@ -256,6 +257,36 @@ export default function AdminPage() {
                     }}
                   >
                     🗑
+                  </button>
+                </div>
+                {f.reply && (
+                  <div className="admin-reply">
+                    <span className="admin-reply-label">👑 ردّك</span>
+                    <p>{f.reply}</p>
+                  </div>
+                )}
+                <div className="reply-box">
+                  <input
+                    type="text"
+                    placeholder={f.reply ? 'تعديل الرد…' : 'اكتبي ردّك — يظهر للمستخدم في التطبيق'}
+                    value={replyDrafts[f.id] ?? ''}
+                    onChange={(e) =>
+                      setReplyDrafts((d) => ({ ...d, [f.id]: e.target.value }))
+                    }
+                  />
+                  <button
+                    className="nav-btn"
+                    disabled={!(replyDrafts[f.id] ?? '').trim()}
+                    onClick={async () => {
+                      await getSupabase()?.rpc('admin_reply_feedback', {
+                        fid: f.id,
+                        msg: (replyDrafts[f.id] ?? '').trim(),
+                      });
+                      setReplyDrafts((d) => ({ ...d, [f.id]: '' }));
+                      loadInbox();
+                    }}
+                  >
+                    ↩︎ رد
                   </button>
                 </div>
               </div>

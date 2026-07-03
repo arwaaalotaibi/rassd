@@ -168,10 +168,13 @@ export default function Home() {
   );
   const [supportOpen, setSupportOpen] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
-  const [supportContact, setSupportContact] = useState('');
   const [supportState, setSupportState] = useState<'idle' | 'sending' | 'sent' | 'error'>(
     'idle'
   );
+  const [myFeedback, setMyFeedback] = useState<
+    { id: number; message: string; reply: string; created_at: string }[]
+  >([]);
+  const [supportUnread, setSupportUnread] = useState(false);
   const [circleOpen, setCircleOpen] = useState(false);
   const [circleRows, setCircleRows] = useState<
     | {
@@ -405,6 +408,23 @@ export default function Home() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+
+    // تنبيه رد الدعم: هل وصلني رد أحدث من آخر اطّلاع؟
+    setTimeout(() => {
+      getSupabase()
+        ?.from('feedback')
+        .select('replied_at')
+        .eq('device_id', ownerRef.current || getDeviceId())
+        .not('replied_at', 'is', null)
+        .order('replied_at', { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+          const latest = data?.[0]?.replied_at as string | undefined;
+          if (latest && latest > (localStorage.getItem('rassd:supportSeen') ?? '')) {
+            setSupportUnread(true);
+          }
+        });
+    }, 3000);
 
     // إعلان المشرفة (إن وُجد ولم يُغلق سابقاً)
     getSupabase()
@@ -916,6 +936,23 @@ export default function Home() {
     }
   };
 
+  // محادثة الدعم: جلب رسائلي وردود المشرفة عليها
+  const loadMyFeedback = useCallback(async () => {
+    const sb = getSupabase();
+    if (!sb) return [] as typeof myFeedback;
+    const me = user?.id ?? identityRef.current;
+    const { data } = await sb
+      .from('feedback')
+      .select('id, message, reply, created_at')
+      .eq('device_id', me)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    const list = (data ?? []) as typeof myFeedback;
+    setMyFeedback(list);
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // إرسال ملاحظة دعم للمشرفة
   const sendSupport = async () => {
     const sb = getSupabase();
@@ -926,7 +963,6 @@ export default function Home() {
     const { error } = await sb.from('feedback').insert({
       device_id: user?.id ?? identityRef.current,
       message: msg,
-      contact: supportContact.trim(),
     });
     if (error) {
       setSupportState('error');
@@ -934,7 +970,7 @@ export default function Home() {
     }
     setSupportState('sent');
     setSupportMsg('');
-    setSupportContact('');
+    loadMyFeedback();
   };
 
   // لوحة الحلقة: ملخّص كل الطالبات دفعة واحدة (المحتاجات للمتابعة أولاً)
@@ -1618,13 +1654,16 @@ export default function Home() {
         </p>
         {syncState !== 'off' && (
           <button
-            className="support-btn"
+            className={`support-btn ${supportUnread ? 'has-reply' : ''}`}
             onClick={() => {
               setSupportState('idle');
               setSupportOpen(true);
+              setSupportUnread(false);
+              localStorage.setItem('rassd:supportSeen', new Date().toISOString());
+              loadMyFeedback();
             }}
           >
-            🛟 الدعم والملاحظات
+            🛟 الدعم والملاحظات{supportUnread && ' — رد جديد ✨'}
           </button>
         )}
       </footer>
@@ -1634,56 +1673,56 @@ export default function Home() {
         <div className="export-backdrop" onClick={() => setSupportOpen(false)}>
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
             <h2>🛟 الدعم والملاحظات</h2>
-            {supportState === 'sent' ? (
-              <>
-                <p className="import-ok">
-                  ✅ وصلت ملاحظتك — شكراً لك! نقرأ كل رسالة ونطوّر البرنامج بها.
-                </p>
-                <div className="export-actions">
-                  <button className="cancel-btn" onClick={() => setSupportOpen(false)}>
-                    إغلاق
-                  </button>
+            <p className="export-hint">
+              واجهتك مشكلة؟ عندك اقتراح؟ اكتبي وسيصلك رد المشرفة <b>هنا داخل
+              البرنامج</b> مع تنبيه على زر الدعم.
+            </p>
+            <textarea
+              className="note-input"
+              rows={3}
+              placeholder="اكتبي ملاحظتك هنا…"
+              value={supportMsg}
+              onChange={(e) => setSupportMsg(e.target.value)}
+            />
+            {supportState === 'error' && (
+              <p className="export-error">⚠️ تعذّر الإرسال — تأكدي من الاتصال وجرّبي</p>
+            )}
+            {supportState === 'sent' && (
+              <p className="import-ok">✅ وصلت — تابعي الرد هنا</p>
+            )}
+            <div className="export-actions">
+              <button
+                className="nav-btn"
+                disabled={!supportMsg.trim() || supportState === 'sending'}
+                onClick={sendSupport}
+              >
+                {supportState === 'sending' ? '⏳ يرسل…' : '📨 إرسال'}
+              </button>
+              <button className="cancel-btn" onClick={() => setSupportOpen(false)}>
+                إغلاق
+              </button>
+            </div>
+
+            {/* محادثتي مع المشرفة */}
+            {myFeedback.length > 0 && (
+              <div className="teachers-section">
+                <h3>💬 رسائلي</h3>
+                <div className="admin-inbox">
+                  {myFeedback.map((f) => (
+                    <div key={f.id} className="feedback-item">
+                      <p className="feedback-message">{f.message}</p>
+                      {f.reply ? (
+                        <div className="admin-reply">
+                          <span className="admin-reply-label">👑 رد المشرفة</span>
+                          <p>{f.reply}</p>
+                        </div>
+                      ) : (
+                        <p className="feedback-meta">⏳ بانتظار الرد…</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </>
-            ) : (
-              <>
-                <p className="export-hint">
-                  واجهتك مشكلة؟ عندك اقتراح؟ اكتبي ملاحظتك وسنقرؤها بإذن الله —
-                  وإن أحببتِ رداً اتركي وسيلة تواصل.
-                </p>
-                <textarea
-                  className="note-input"
-                  rows={4}
-                  placeholder="اكتبي ملاحظتك هنا…"
-                  value={supportMsg}
-                  onChange={(e) => setSupportMsg(e.target.value)}
-                />
-                <label className="sync-code-label">
-                  وسيلة تواصل (اختياري):
-                  <input
-                    type="text"
-                    dir="ltr"
-                    placeholder="إيميل أو جوال"
-                    value={supportContact}
-                    onChange={(e) => setSupportContact(e.target.value)}
-                  />
-                </label>
-                {supportState === 'error' && (
-                  <p className="export-error">⚠️ تعذّر الإرسال — تأكدي من الاتصال وجرّبي</p>
-                )}
-                <div className="export-actions">
-                  <button
-                    className="nav-btn"
-                    disabled={!supportMsg.trim() || supportState === 'sending'}
-                    onClick={sendSupport}
-                  >
-                    {supportState === 'sending' ? '⏳ يرسل…' : '📨 إرسال'}
-                  </button>
-                  <button className="cancel-btn" onClick={() => setSupportOpen(false)}>
-                    إلغاء
-                  </button>
-                </div>
-              </>
+              </div>
             )}
           </div>
         </div>

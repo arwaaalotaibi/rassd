@@ -612,6 +612,53 @@ body {
   opacity: 0.6;
 }
 
+/* رد المشرفة */
+.admin-reply {
+  background: linear-gradient(160deg, #fdf3d7, #f7e7b5);
+  border: 1.5px solid var(--gold);
+  border-radius: 12px 12px 3px 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.admin-reply-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #a3812e;
+}
+
+.admin-reply p {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b4f10;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.reply-box {
+  display: flex;
+  gap: 6px;
+}
+
+.reply-box input {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.reply-box .nav-btn {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.support-btn.has-reply {
+  border-color: var(--gold);
+  background: linear-gradient(90deg, rgba(184, 145, 47, 0.16), rgba(20, 97, 74, 0.1));
+  animation: online-pulse 2s infinite;
+}
+
 /* ————— الشعار ————— */
 .brand {
   display: flex;
