@@ -137,7 +137,7 @@ export default function Home() {
   const [hifzSurah, setHifzSurah] = useState(1);
   const [hifzFrom, setHifzFrom] = useState('1');
   const [hifzTo, setHifzTo] = useState('1');
-  const [hifzRepeat, setHifzRepeat] = useState('3');
+  const [hifzRepeat, setHifzRepeat] = useState('1');
   const [hifzRounds, setHifzRounds] = useState('1');
   const [hifzMsg, setHifzMsg] = useState('');
   const [hifzStatus, setHifzStatus] = useState<{
