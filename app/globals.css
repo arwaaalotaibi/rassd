@@ -1190,6 +1190,67 @@ body {
 }
 
 /* مكرِّر الحفظ */
+/* الآية التي تُتلى الآن — توهّج ذهبي فوق أي تظليل رصد */
+.word.reciting,
+.ayah-end.reciting {
+  background: rgba(184, 145, 47, 0.3);
+  box-shadow: 0 0 0 2px rgba(184, 145, 47, 0.35);
+  border-radius: 6px;
+  animation: recite-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes recite-pulse {
+  0%,
+  100% {
+    background: rgba(184, 145, 47, 0.3);
+  }
+  50% {
+    background: rgba(184, 145, 47, 0.16);
+  }
+}
+
+/* الشريط العائم أثناء التلاوة */
+.hifz-bar {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--green-deep);
+  color: var(--paper);
+  border: 2px solid var(--gold);
+  border-radius: 999px;
+  padding: 8px 10px 8px 18px;
+  box-shadow: 0 12px 32px rgba(13, 69, 52, 0.45);
+  max-width: min(94vw, 560px);
+}
+
+.hifz-bar-text {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hifz-bar-stop {
+  background: #c0392b;
+  color: #fdfaf1;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hifz-bar-stop:hover {
+  background: #8b2f22;
+}
+
 .hifz-status {
   text-align: center;
   font-size: 14px;

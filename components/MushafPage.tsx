@@ -16,9 +16,16 @@ type Props = {
   chapters: Map<number, Chapter>;
   marks?: Map<string, ErrorMark[]>;
   onWordClick?: (wordId: string, el: HTMLElement) => void;
+  activeVerse?: string | null; // "سورة:آية" — الآية التي تُتلى الآن (مكرِّر الحفظ)
 };
 
-export default function MushafPage({ data, chapters, marks, onWordClick }: Props) {
+export default function MushafPage({
+  data,
+  chapters,
+  marks,
+  onWordClick,
+  activeVerse,
+}: Props) {
   const lines = useMemo(() => buildLines(data), [data]);
   const ornate = data.page <= 2; // الفاتحة وبداية البقرة بتنسيق مزخرف مُوسَّط
   const firstChapter = data.verses[0]?.chapter;
@@ -58,9 +65,10 @@ export default function MushafPage({ data, chapters, marks, onWordClick }: Props
               return (
                 <div key={i} className={`mushaf-line ${centered ? 'centered' : ''}`}>
                   {slot.words.map((w) => {
+                    const reciting = activeVerse ? w.id.startsWith(activeVerse + ':') : false;
                     if (w.type === 'end') {
                       return (
-                        <span key={w.id} className="ayah-end">
+                        <span key={w.id} className={`ayah-end ${reciting ? 'reciting' : ''}`}>
                           {'۝' + toArabicDigits(w.text)}
                         </span>
                       );
@@ -71,7 +79,7 @@ export default function MushafPage({ data, chapters, marks, onWordClick }: Props
                     return (
                       <span
                         key={w.id}
-                        className={`word ${t ? 'marked' : ''}`}
+                        className={`word ${t ? 'marked' : ''} ${reciting ? 'reciting' : ''}`}
                         style={
                           t
                             ? ({ '--mark-color': t.color, '--mark-bg': t.bg } as CSSProperties)

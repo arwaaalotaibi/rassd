@@ -145,6 +145,7 @@ export default function Home() {
     round: number;
   } | null>(null);
   const hifzStopRef = useRef(true);
+  const pageRef = useRef(1);
   const [liveIdentity, setLiveIdentity] = useState('');
   const liveChannelRef = useRef<ReturnType<
     NonNullable<ReturnType<typeof getSupabase>>['channel']
@@ -453,6 +454,7 @@ export default function Home() {
     });
     if (page < TOTAL_PAGES) fetchPage(page + 1);
     if (page > 1) fetchPage(page - 1);
+    pageRef.current = page;
     localStorage.setItem('rassd:page', String(page));
   }, [page]);
 
@@ -764,6 +766,21 @@ export default function Home() {
     }
   };
 
+  // البحث عن صفحة آية معيّنة ضمن نطاق صفحات سورتها (الصفحات مخبّأة في الذاكرة)
+  const findPageOfVerse = useCallback(
+    async (surah: number, ayah: number): Promise<number | null> => {
+      const c = chapterMap.get(surah);
+      if (!c) return null;
+      const key = `${surah}:${ayah}`;
+      for (let p = c.pages[0]; p <= c.pages[1]; p++) {
+        const d = await fetchPage(p);
+        if (d.verses.some((v) => v.key === key)) return p;
+      }
+      return null;
+    },
+    [chapterMap]
+  );
+
   // مكرِّر الحفظ: تشغيل نطاق آيات، كل آية تتكرر N مرة، والمجموعة كلها لعدد جولات
   const stopHifz = useCallback(() => {
     hifzStopRef.current = true;
@@ -794,10 +811,16 @@ export default function Home() {
     }
     setHifzMsg('');
     setPlayingAyah(null);
+    setHifzOpen(false); // التلاوة على المصحف نفسه، لا داخل النافذة
     hifzStopRef.current = false;
     const pad = (n: number) => String(n).padStart(3, '0');
     outer: for (let round = 1; round <= rounds; round++) {
       for (let a = from; a <= to; a++) {
+        if (hifzStopRef.current) break outer;
+        // نقلب الصفحة تلقائياً إلى موضع الآية الحالية
+        const versePage = await findPageOfVerse(hifzSurah, a);
+        if (hifzStopRef.current) break outer;
+        if (versePage && versePage !== pageRef.current) go(versePage);
         for (let i = 1; i <= repeat; i++) {
           if (hifzStopRef.current) break outer;
           setHifzStatus({ ayah: a, iter: i, round });
@@ -1139,6 +1162,7 @@ export default function Home() {
             chapters={chapterMap}
             marks={pageMarks}
             onWordClick={onWordClick}
+            activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : null}
           />
         ) : (
           <div
@@ -1228,6 +1252,22 @@ export default function Home() {
       <footer className="text-xs opacity-60 font-semibold pb-2">
         النص القرآني وفق مصحف المدينة النبوية — مجمع الملك فهد لطباعة المصحف الشريف
       </footer>
+
+      {/* شريط مكرِّر الحفظ العائم — يظهر أثناء التلاوة على المصحف */}
+      {hifzStatus && (
+        <div className="hifz-bar">
+          <span className="hifz-bar-text">
+            🎧 {chapterMap.get(hifzSurah)?.name ?? ''} — الآية{' '}
+            {toArabicDigits(hifzStatus.ayah)} · تكرار {toArabicDigits(hifzStatus.iter)}/
+            {toArabicDigits(Number(hifzRepeat) || 1)}
+            {Number(hifzRounds) > 1 &&
+              ` · جولة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`}
+          </span>
+          <button className="hifz-bar-stop" onClick={stopHifz}>
+            ⏹ إيقاف
+          </button>
+        </div>
+      )}
 
       {/* نافذة تصدير PDF */}
       {exportOpen && (
