@@ -1,7 +1,7 @@
 'use client';
 
-// صفحة المشرفة: إحصاءات مجمّعة + إعلان عام + حذف بيانات مستخدم
-// البوابة الحقيقية في قاعدة البيانات (الدوال ترجع null لغير المشرفة)
+// صفحة الإدارة: إحصاءات مجمّعة + إعلان عام + حذف بيانات مستخدم
+// البوابة الحقيقية في قاعدة البيانات (الدوال ترجع null لغير الإدارة)
 
 import { toArabicDigits, type Chapter } from '@/lib/quran';
 import { getSupabase } from '@/lib/supabase';
@@ -12,6 +12,7 @@ type FeedbackItem = {
   message: string;
   reply: string;
   device_id: string;
+  email: string;
   at: string;
 };
 
@@ -117,11 +118,11 @@ export default function AdminPage() {
     return (
       <main className="admin-root">
         <p className="admin-note">
-          هذه الصفحة للمشرفة فقط — سجّلي الدخول بحساب المشرفة من{' '}
+          هذه الصفحة للإدارة فقط — سجّل الدخول بحساب الإدارة من{' '}
           <a href="/" className="admin-link">
             الصفحة الرئيسية
           </a>{' '}
-          ثم عودي.
+          ثم عُد.
         </p>
       </main>
     );
@@ -134,7 +135,7 @@ export default function AdminPage() {
       <header className="admin-header">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="" className="brand-logo" />
-        <h1>لوحة المشرفة</h1>
+        <h1>لوحة الإدارة</h1>
         <a href="/" className="admin-link">
           ← للمصحف
         </a>
@@ -162,7 +163,7 @@ export default function AdminPage() {
           </div>
           <div className="stat-card">
             <b>{toArabicDigits(stats.teachers)}</b>
-            <span>معلّمات</span>
+            <span>معلّمون</span>
           </div>
           <div className="stat-card">
             <b>{toArabicDigits(stats.links)}</b>
@@ -244,6 +245,11 @@ export default function AdminPage() {
                 <p className="feedback-message">{f.message}</p>
                 <div className="feedback-meta">
                   <span>🗓 {toArabicDigits(f.at)}</span>
+                  {f.email ? (
+                    <span dir="ltr">📧 {f.email}</span>
+                  ) : (
+                    <span>👤 ضيف</span>
+                  )}
                   <span dir="ltr" className="feedback-sender">
                     {f.device_id.slice(0, 8)}…
                   </span>
@@ -268,7 +274,7 @@ export default function AdminPage() {
                 <div className="reply-box">
                   <input
                     type="text"
-                    placeholder={f.reply ? 'تعديل الرد…' : 'اكتبي ردّك — يظهر للمستخدم في التطبيق'}
+                    placeholder={f.reply ? 'تعديل الرد…' : 'اكتب ردّك — يظهر للمستخدم في التطبيق'}
                     value={replyDrafts[f.id] ?? ''}
                     onChange={(e) =>
                       setReplyDrafts((d) => ({ ...d, [f.id]: e.target.value }))
@@ -299,7 +305,7 @@ export default function AdminPage() {
       <section className="admin-card">
         <h2>📢 إعلان لجميع المستخدمين</h2>
         <p className="admin-note">
-          يظهر شريطاً أعلى التطبيق للجميع. اتركيه فارغاً واضغطي «نشر» لإزالة
+          يظهر شريطاً أعلى التطبيق للجميع. اتركه فارغاً واضغط «نشر» لإزالة
           الإعلان الحالي.
         </p>
         <textarea
@@ -319,7 +325,7 @@ export default function AdminPage() {
       <section className="admin-card danger">
         <h2>🗑️ حذف بيانات مستخدم (نهائي)</h2>
         <p className="admin-note">
-          لطلبات «احذفوا بياناتي»: الصقي رمز المستخدم وسيُحذف كل ما يخصه (علامات،
+          لطلبات «احذفوا بياناتي»: الصق رمز المستخدم وسيُحذف كل ما يخصه (علامات،
           سجلات، روابط).
         </p>
         <input

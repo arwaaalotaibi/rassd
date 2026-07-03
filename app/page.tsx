@@ -426,7 +426,7 @@ export default function Home() {
         });
     }, 3000);
 
-    // إعلان المشرفة (إن وُجد ولم يُغلق سابقاً)
+    // إعلان الإدارة (إن وُجد ولم يُغلق سابقاً)
     getSupabase()
       ?.from('announcements')
       .select('id, message')
@@ -479,7 +479,7 @@ export default function Home() {
   }, []);
 
   // الجلسة الحيّة: قناة بثّ لكل مصحف — أي كتابة عن بُعد ترسل «جرساً»
-  // فيعيد الجهاز المشترك مزامنته فوراً (المعلّمة ترصد → تظهر عند الطالبة لحظياً)
+  // فيعيد الجهاز المشترك مزامنته فوراً (المعلّمة ترصد → تظهر عند الطالب لحظياً)
   useEffect(() => {
     const sb = getSupabase();
     if (!sb || !liveIdentity) return;
@@ -592,7 +592,7 @@ export default function Home() {
     const name = newName.trim();
     const code = newCode.trim() ? newCode.trim().toLowerCase() : crypto.randomUUID();
     if (!name) {
-      setStudentMsg('اكتبي اسم الطالب');
+      setStudentMsg('اكتب اسم الطالب');
       return;
     }
     if (!UUID_RE.test(code)) {
@@ -600,7 +600,7 @@ export default function Home() {
       return;
     }
     if (code === getDeviceId().toLowerCase()) {
-      setStudentMsg('هذا رمزك أنتِ وليس رمز طالب');
+      setStudentMsg('هذا رمزك أنت وليس رمز طالب');
       return;
     }
     if (students.some((s) => s.id === code)) {
@@ -621,7 +621,7 @@ export default function Home() {
   const doImport = async () => {
     const code = importCode.trim().toLowerCase();
     if (!UUID_RE.test(code)) {
-      setImportMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
+      setImportMsg('الرمز غير صحيح — تأكد من نسخه كاملاً');
       return;
     }
     setImportBusy(true);
@@ -629,7 +629,7 @@ export default function Home() {
     const imported = await fetchMarksByCode(code);
     setImportBusy(false);
     if (imported === null) {
-      setImportMsg('تعذّر الجلب — تأكدي من الرمز والاتصال');
+      setImportMsg('تعذّر الجلب — تأكد من الرمز والاتصال');
       return;
     }
     if (imported.length === 0) {
@@ -679,7 +679,7 @@ export default function Home() {
     const from = exportFrom ? Number(normalizeDigits(exportFrom)) : page;
     const to = exportTo ? Number(normalizeDigits(exportTo)) : from;
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > TOTAL_PAGES) {
-      setExportErr(`أدخلي أرقام صفحات بين ١ و${toArabicDigits(TOTAL_PAGES)}`);
+      setExportErr(`أدخل أرقام صفحات بين ١ و${toArabicDigits(TOTAL_PAGES)}`);
       return;
     }
     if (to < from) {
@@ -739,7 +739,7 @@ export default function Home() {
       pdf.save(`rassd-${from}${to !== from ? `-${to}` : ''}.pdf`);
       setExportOpen(false);
     } catch {
-      setExportErr('تعذّر إنشاء الملف — جرّبي مرة أخرى أو قلّلي عدد الصفحات');
+      setExportErr('تعذّر إنشاء الملف — جرّب مرة أخرى أو قلّل عدد الصفحات');
     } finally {
       setExportBusy('');
       setPrintData(null);
@@ -793,7 +793,7 @@ export default function Home() {
     } catch {
       setListBusy('');
       setListPrint(null);
-      alert('تعذّر إنشاء الملف — جرّبي مرة أخرى');
+      alert('تعذّر إنشاء الملف — جرّب مرة أخرى');
       return;
     }
     setListBusy('');
@@ -867,7 +867,7 @@ export default function Home() {
         a.click();
       }
     } catch {
-      alert('تعذّر إنشاء البطاقة — جرّبي مرة أخرى');
+      alert('تعذّر إنشاء البطاقة — جرّب مرة أخرى');
     } finally {
       setShareBusy(false);
       setShareCard(null);
@@ -897,7 +897,7 @@ export default function Home() {
     const from = norm(logFrom);
     const to = norm(logTo);
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > maxAyah) {
-      setLogMsg(`أدخلي آيات بين ١ و${toArabicDigits(maxAyah)}`);
+      setLogMsg(`أدخل آيات بين ١ و${toArabicDigits(maxAyah)}`);
       return;
     }
     if (to < from) {
@@ -936,7 +936,7 @@ export default function Home() {
     }
   };
 
-  // محادثة الدعم: جلب رسائلي وردود المشرفة عليها
+  // محادثة الدعم: جلب رسائلي وردود الإدارة عليها
   const loadMyFeedback = useCallback(async () => {
     const sb = getSupabase();
     if (!sb) return [] as typeof myFeedback;
@@ -953,7 +953,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // إرسال ملاحظة دعم للمشرفة
+  // إرسال ملاحظة دعم للإدارة
   const sendSupport = async () => {
     const sb = getSupabase();
     const msg = supportMsg.trim();
@@ -973,7 +973,7 @@ export default function Home() {
     loadMyFeedback();
   };
 
-  // لوحة الحلقة: ملخّص كل الطالبات دفعة واحدة (المحتاجات للمتابعة أولاً)
+  // لوحة الحلقة: ملخّص كل الطلاب دفعة واحدة (المحتاجات للمتابعة أولاً)
   const openCircle = async () => {
     setCircleOpen(true);
     setCircleRows(null);
@@ -1043,7 +1043,7 @@ export default function Home() {
     const repeat = norm(hifzRepeat);
     const rounds = hifzRounds === 'inf' ? Infinity : norm(hifzRounds);
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > maxAyah) {
-      setHifzMsg(`أدخلي آيات بين ١ و${toArabicDigits(maxAyah)}`);
+      setHifzMsg(`أدخل آيات بين ١ و${toArabicDigits(maxAyah)}`);
       return;
     }
     if (to < from) {
@@ -1147,7 +1147,7 @@ export default function Home() {
 
   return (
     <main className="app-root flex-1 flex flex-col items-center gap-5 px-4 py-6">
-      {/* إعلان المشرفة */}
+      {/* إعلان الإدارة */}
       {announcement && (
         <div className="announce-bar w-full max-w-xl">
           <span>📢 {announcement.message}</span>
@@ -1431,8 +1431,8 @@ export default function Home() {
           <div className="layers-body">
             {layers.length === 0 && sessionLogs.length === 0 ? (
               <p className="layers-empty">
-                لا توجد جلسات بعد — ارصدي أول خطأ وستظهر جلسة اليوم هنا،
-                وتقدرين تخفين أخطاء أي جلسة أو تظهرينها متى شئتِ.
+                لا توجد جلسات بعد — ارصد أول خطأ وستظهر جلسة اليوم هنا،
+                ويمكنك إخفاء أخطاء أي جلسة أو إظهارها متى شئت.
               </p>
             ) : (
               <>
@@ -1674,18 +1674,18 @@ export default function Home() {
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
             <h2>🛟 الدعم والملاحظات</h2>
             <p className="export-hint">
-              واجهتك مشكلة؟ عندك اقتراح؟ اكتبي وسيصلك رد المشرفة <b>هنا داخل
+              واجهتك مشكلة؟ عندك اقتراح؟ اكتب وسيصلك رد الإدارة <b>هنا داخل
               البرنامج</b> مع تنبيه على زر الدعم.
             </p>
             <textarea
               className="note-input"
               rows={3}
-              placeholder="اكتبي ملاحظتك هنا…"
+              placeholder="اكتب ملاحظتك هنا…"
               value={supportMsg}
               onChange={(e) => setSupportMsg(e.target.value)}
             />
             {supportState === 'error' && (
-              <p className="export-error">⚠️ تعذّر الإرسال — تأكدي من الاتصال وجرّبي</p>
+              <p className="export-error">⚠️ تعذّر الإرسال — تأكد من الاتصال وجرّب</p>
             )}
             {supportState === 'sent' && (
               <p className="import-ok">✅ وصلت — تابعي الرد هنا</p>
@@ -1703,7 +1703,7 @@ export default function Home() {
               </button>
             </div>
 
-            {/* محادثتي مع المشرفة */}
+            {/* محادثتي مع الإدارة */}
             {myFeedback.length > 0 && (
               <div className="teachers-section">
                 <h3>💬 رسائلي</h3>
@@ -1713,7 +1713,7 @@ export default function Home() {
                       <p className="feedback-message">{f.message}</p>
                       {f.reply ? (
                         <div className="admin-reply">
-                          <span className="admin-reply-label">👑 رد المشرفة</span>
+                          <span className="admin-reply-label">👑 رد الإدارة</span>
                           <p>{f.reply}</p>
                         </div>
                       ) : (
@@ -1754,7 +1754,7 @@ export default function Home() {
             <h2>📄 تصدير PDF</h2>
             <p className="export-hint">
               يُصدَّر المصحف بالأخطاء الظاهرة حالياً حسب الجلسات المفعّلة في «جلسات
-              التسميع». اتركي الحقلين كما هما لتصدير الصفحة الحالية فقط.
+              التسميع». اترك الحقلين كما هما لتصدير الصفحة الحالية فقط.
             </p>
             <div className="export-range">
               <label>
@@ -1799,7 +1799,7 @@ export default function Home() {
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
             <h2>📋 تقييم جلسة {toArabicDigits(sessionDate)}</h2>
             <p className="export-hint">
-              سجّلي وش سمّعت {activeName ? `${activeName} ` : ''}اليوم وقيّمي الأداء —
+              سجّل ما سمّعه {activeName ? `${activeName} ` : ''}اليوم وقيّم الأداء —
               يظهر السجل في «جلسات التسميع» وفي لوحة الحلقة.
             </p>
             <label className="sync-code-label">
@@ -1864,7 +1864,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* لوحة الحلقة: كل الطالبات في نظرة واحدة */}
+      {/* لوحة الحلقة: كل الطلاب في نظرة واحدة */}
       {circleOpen && (
         <div className="export-backdrop" onClick={() => setCircleOpen(false)}>
           <div
@@ -1873,7 +1873,7 @@ export default function Home() {
           >
             <h2>👩‍🏫 لوحة الحلقة</h2>
             {circleRows === null ? (
-              <p className="layers-empty">⏳ يجمع بيانات الطالبات…</p>
+              <p className="layers-empty">⏳ يجمع بيانات الطلاب…</p>
             ) : (
               <>
                 <p className="export-hint">
@@ -1903,7 +1903,7 @@ export default function Home() {
                       <div className="circle-row-meta">
                         <span>
                           آخر جلسة:{' '}
-                          {r.lastDate ? formatArabicDate(r.lastDate) : 'لم تسمّع بعد'}
+                          {r.lastDate ? formatArabicDate(r.lastDate) : 'لم يسمّع بعد'}
                         </span>
                         <span>أخطاء الأسبوع: {toArabicDigits(r.weekMarks)}</span>
                         <span>متكرّرة: {toArabicDigits(r.repeated)}</span>
@@ -1915,7 +1915,7 @@ export default function Home() {
                           setCircleOpen(false);
                         }}
                       >
-                        فتح مصحفها ↗
+                        فتح مصحفه ↗
                       </button>
                     </div>
                   ))}
@@ -1943,9 +1943,9 @@ export default function Home() {
           <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
             <h2>🎧 الاستماع والتكرار</h2>
             <p className="export-hint">
-              اختاري الآيات وعدد التكرار، واتركي التلاوة تعيد عليك — كل آية تتكرر
+              اختر الآيات وعدد التكرار، ودَع التلاوة تعيد عليك — كل آية تتكرر
               العدد المحدّد ثم تنتقل للتي بعدها، والمقطع كاملاً يُعاد بالعدد الذي
-              تختارينه أو بلا توقف حتى توقفينه.
+              تختاره أو بلا توقف حتى توقفه.
             </p>
             <label className="sync-code-label">
               القارئ:
@@ -2018,7 +2018,7 @@ export default function Home() {
                   <option value="3">٣ مرات</option>
                   <option value="5">٥ مرات</option>
                   <option value="10">١٠ مرات</option>
-                  <option value="inf">∞ بلا توقف — حتى أوقفها</option>
+                  <option value="inf">∞ بلا توقف — حتى الإيقاف</option>
                 </select>
               </label>
             </div>
@@ -2041,7 +2041,7 @@ export default function Home() {
                 </button>
               ) : (
                 <button className="nav-btn" onClick={startHifz}>
-                  ▶️ ابدئي التلاوة
+                  ▶️ ابدأ التلاوة
                 </button>
               )}
               <button
@@ -2076,7 +2076,7 @@ export default function Home() {
 
             {stats.totalWords === 0 ? (
               <p className="layers-empty">
-                لا يوجد رصد بعد — ابدئي التسميع وارصدي الأخطاء وسترين هنا تطوّرك
+                لا يوجد رصد بعد — ابدأ التسميع وارصد الأخطاء وسترى هنا تطوّرك
                 جلسة بعد جلسة.
               </p>
             ) : (
@@ -2261,7 +2261,7 @@ export default function Home() {
             {!otpSent ? (
               <>
                 <p className="export-hint">
-                  اكتبي إيميلك وبنرسل لك رمز دخول — بدون كلمة مرور نهائياً. إذا
+                  اكتب إيميلك وبنرسل لك رمز دخول — بدون كلمة مرور نهائياً. إذا
                   كانت أول مرة، ينشأ حسابك تلقائياً.
                 </p>
                 <label className="sync-code-label">
@@ -2296,7 +2296,7 @@ export default function Home() {
                       else setOtpSent(true);
                     }}
                   >
-                    {otpBusy ? '⏳ يرسل…' : '📨 أرسلي الرمز'}
+                    {otpBusy ? '⏳ يرسل…' : '📨 أرسل الرمز'}
                   </button>
                   <button className="cancel-btn" onClick={() => setEmailOpen(false)}>
                     إلغاء
@@ -2306,8 +2306,8 @@ export default function Home() {
             ) : (
               <>
                 <p className="export-hint">
-                  أرسلنا رمزاً إلى <b dir="ltr">{emailVal.trim()}</b> — اكتبيه هنا
-                  (أو اضغطي رابط الدخول في الرسالة نفسها). تفقّدي «غير المرغوب» إذا
+                  أرسلنا رمزاً إلى <b dir="ltr">{emailVal.trim()}</b> — اكتبه هنا
+                  (أو اضغط رابط الدخول في الرسالة نفسها). تفقّد «غير المرغوب» إذا
                   تأخّر.
                 </p>
                 <label className="sync-code-label">
@@ -2368,8 +2368,8 @@ export default function Home() {
             {user ? (
               <>
                 <p className="export-hint">
-                  أرسلي رمزك هذا لطلابك — كل طالب مسجَّل بحسابه يضيفه من «🎓 معلّمي»
-                  عنده، فيظهر هنا باسمه تلقائياً. وعندها كل ما ترصدينه له يظهر في
+                  أرسل رمزك هذا لطلابك — كل طالب مسجَّل بحسابه يضيفه من «🎓 معلّمي»
+                  عنده، فيظهر هنا باسمه تلقائياً. وعندها كل ما ترصده له يظهر في
                   «جلسات التسميع» عنده مباشرة، ويستطيع إلغاء الربط متى شاء.
                 </p>
                 <div className="sync-code-box">
@@ -2387,7 +2387,7 @@ export default function Home() {
             ) : (
               <p className="export-hint">
                 يفتح الطالب «رصد» في جهازه → «🔗 أجهزتي» → ينسخ رمزه ويرسله لك.
-                أضيفيه هنا باسمه ورمزه، ثم اختاريه من «أرصد في» — كل ما ترصدينه
+                أضفه هنا باسمه ورمزه، ثم اختره من «أرصد في» — كل ما ترصده
                 يُحفظ في مصحف الطالب نفسه ويظهر في «جلسات التسميع» عنده مباشرة.
               </p>
             )}
@@ -2400,7 +2400,7 @@ export default function Home() {
                     </span>
                     <button
                       className="copy-code-btn"
-                      title="نسخ رمز الطالب — أرسليه له ليستلم جلساته في جهازه أو حسابه"
+                      title="نسخ رمز الطالب — أرسله له ليستلم جلساته في جهازه أو حسابه"
                       onClick={() => {
                         navigator.clipboard?.writeText(s.id).then(() => {
                           setCopiedStudentId(s.id);
@@ -2435,8 +2435,8 @@ export default function Home() {
             )}
             <p className="export-hint dim-hint">
               {user
-                ? 'أو أضيفي طالباً بلا حساب: بالاسم فقط (نولّد له رمزاً) أو برمز جهازه إن كان عنده التطبيق. لاحقاً أرسلي له رمزه من زر «📋 رمزه» ليستلم كل جلساته.'
-                : 'أضيفي الطالب بالاسم فقط (نولّد له رمزاً) أو برمز جهازه إن كان عنده التطبيق.'}
+                ? 'أو أضف طالباً بلا حساب: بالاسم فقط (نولّد له رمزاً) أو برمز جهازه إن كان عنده التطبيق. لاحقاً أرسل له رمزه من زر «📋 رمزه» ليستلم كل جلساته.'
+                : 'أضف الطالب بالاسم فقط (نولّد له رمزاً) أو برمز جهازه إن كان عنده التطبيق.'}
             </p>
             <label className="sync-code-label">
               اسم الطالب:
@@ -2454,7 +2454,7 @@ export default function Home() {
                 dir="ltr"
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
-                placeholder="اتركيه فارغاً لطالب بلا تطبيق"
+                placeholder="اتركه فارغاً لطالب بلا تطبيق"
               />
             </label>
             {studentMsg && <p className="export-error">⚠️ {studentMsg}</p>}
@@ -2477,8 +2477,8 @@ export default function Home() {
             <h2>{user ? '🔗 رمزي' : '🔗 ربط أجهزتي'}</h2>
             <p className="export-hint">
               {user
-                ? 'حسابك يزامن أجهزتك تلقائياً — سجّلي الدخول بنفس الحساب على أي جهاز. وهذا رمزك ترسلينه لمعلّمك ليضيفك في «👥 طلابي».'
-                : 'عشان يظهر نفس الرصد على جوالك وكمبيوترك: انسخي الرمز من جهازك الأساسي، وافتحي «رصد» على الجهاز الآخر والصقيه هناك ثم اضغطي «ربط». وإذا كان لك معلّم يتابعك: أرسلي له هذا الرمز نفسه ليضيفك في «👥 طلابي».'}
+                ? 'حسابك يزامن أجهزتك تلقائياً — سجّل الدخول بنفس الحساب على أي جهاز. وهذا رمزك ترسله لمعلّمك ليضيفك في «👥 طلابي».'
+                : 'عشان يظهر نفس الرصد على جوالك وكمبيوترك: انسخ الرمز من جهازك الأساسي، وافتح «رصد» على الجهاز الآخر والصقه هناك ثم اضغط «ربط». وإذا كان لك معلّم يتابعك: أرسل له هذا الرمز نفسه ليضيفك في «👥 طلابي».'}
             </p>
             <div className="sync-code-box">
               <code>{user?.id ?? getDeviceId()}</code>
@@ -2495,7 +2495,7 @@ export default function Home() {
             </div>
             {!user && (
               <label className="sync-code-label">
-                الصقي رمز الجهاز الآخر هنا:
+                الصق رمز الجهاز الآخر هنا:
                 <input
                   type="text"
                   dir="ltr"
@@ -2548,7 +2548,7 @@ export default function Home() {
                     type="text"
                     value={teacherLabel}
                     onChange={(e) => setTeacherLabel(e.target.value)}
-                    placeholder="مثال: أ. سارة"
+                    placeholder="مثال: أ. خالد"
                   />
                 </label>
                 {teacherMsg && <p className="export-error">⚠️ {teacherMsg}</p>}
@@ -2581,8 +2581,8 @@ export default function Home() {
               <div className="teachers-section">
                 <h3>📥 استيراد رصد قديم</h3>
                 <p className="export-hint">
-                  إذا كانت معلّمتك ترصد لك برمز قبل أن يكون لك حساب: اطلبي منها
-                  رمزك (زر «📋 رمزه» عندها) والصقيه هنا — كل جلساتك القديمة تنتقل
+                  إذا كان معلّمك يرصد لك برمز قبل أن يكون لك حساب: اطلب منه
+                  رمزك (زر «📋 رمزه» عنده) والصقه هنا — كل جلساتك القديمة تنتقل
                   إلى حسابك.
                 </p>
                 <label className="sync-code-label">
@@ -2619,7 +2619,7 @@ export default function Home() {
                     const oldId = getDeviceId();
                     const result = adoptSyncCode(linkInput);
                     if (result === 'invalid') {
-                      setLinkMsg('الرمز غير صحيح — تأكدي من نسخه كاملاً');
+                      setLinkMsg('الرمز غير صحيح — تأكد من نسخه كاملاً');
                       return;
                     }
                     if (result === 'same') {

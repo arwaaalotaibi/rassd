@@ -74,7 +74,7 @@ export async function sendEmailOtp(email: string): Promise<string | null> {
     options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
   });
   if (!error) return null;
-  if (error.status === 429) return 'محاولات كثيرة — انتظري دقائق ثم أعيدي';
+  if (error.status === 429) return 'محاولات كثيرة — انتظر دقائق ثم أعد';
   return error.message;
 }
 
@@ -83,8 +83,8 @@ export async function verifyEmailOtp(email: string, token: string): Promise<stri
   if (!sb) return 'المزامنة غير مفعّلة';
   const { error } = await sb.auth.verifyOtp({ email, token: token.trim(), type: 'email' });
   if (!error) return null;
-  if (error.message.toLowerCase().includes('expired')) return 'الرمز انتهت صلاحيته — أرسلي رمزاً جديداً';
-  return 'الرمز غير صحيح — تأكدي منه وأعيدي';
+  if (error.message.toLowerCase().includes('expired')) return 'الرمز انتهت صلاحيته — أرسل رمزاً جديداً';
+  return 'الرمز غير صحيح — تأكد منه وأعد';
 }
 
 export async function signOutAccount() {
@@ -198,10 +198,10 @@ export async function addTeacherLink(
   if (!sb) return 'المزامنة غير مفعّلة';
   const { data: session } = await sb.auth.getSession();
   const uid = session.session?.user?.id;
-  if (!uid) return 'سجّلي الدخول أولاً';
+  if (!uid) return 'سجّل الدخول أولاً';
   const code = teacherCode.trim().toLowerCase();
   if (!UUID_RE.test(code)) return 'رمز المعلّم غير صحيح';
-  if (code === uid) return 'هذا رمزك أنتِ وليس رمز المعلّم';
+  if (code === uid) return 'هذا رمزك أنت وليس رمز المعلّم';
   const { error } = await sb.from('teacher_links').insert({
     student_id: uid,
     teacher_id: code,
@@ -209,7 +209,7 @@ export async function addTeacherLink(
     teacher_label: teacherLabel,
   });
   if (error) {
-    return error.code === '23505' ? 'هذا المعلّم مرتبط بك من قبل' : 'تعذّر الربط — جرّبي مرة أخرى';
+    return error.code === '23505' ? 'هذا المعلّم مرتبط بك من قبل' : 'تعذّر الربط — جرّب مرة أخرى';
   }
   return null;
 }
