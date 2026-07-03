@@ -163,6 +163,9 @@ export default function Home() {
   const [logTo, setLogTo] = useState('1');
   const [logRating, setLogRating] = useState<SessionRating>('excellent');
   const [logMsg, setLogMsg] = useState('');
+  const [announcement, setAnnouncement] = useState<{ id: number; message: string } | null>(
+    null
+  );
   const [circleOpen, setCircleOpen] = useState(false);
   const [circleRows, setCircleRows] = useState<
     | {
@@ -396,6 +399,20 @@ export default function Home() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+
+    // إعلان المشرفة (إن وُجد ولم يُغلق سابقاً)
+    getSupabase()
+      ?.from('announcements')
+      .select('id, message')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        const a = data?.[0];
+        if (a && localStorage.getItem(`rassd:announce-dismissed:${a.id}`) !== '1') {
+          setAnnouncement(a);
+        }
+      });
 
     const boot = async () => {
       const sessionUser = await getSessionUser();
@@ -1067,6 +1084,22 @@ export default function Home() {
 
   return (
     <main className="app-root flex-1 flex flex-col items-center gap-5 px-4 py-6">
+      {/* إعلان المشرفة */}
+      {announcement && (
+        <div className="announce-bar w-full max-w-xl">
+          <span>📢 {announcement.message}</span>
+          <button
+            onClick={() => {
+              localStorage.setItem(`rassd:announce-dismissed:${announcement.id}`, '1');
+              setAnnouncement(null);
+            }}
+            aria-label="إغلاق الإعلان"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* الترويسة */}
       <header className="w-full max-w-xl flex flex-wrap items-center justify-between gap-2">
         <div className="brand">
