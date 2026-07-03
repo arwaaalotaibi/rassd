@@ -25,6 +25,14 @@ import {
   type StudentProfile,
 } from '@/lib/profiles';
 import { DEFAULT_RECITER, RECITERS, ayahAudioUrl, loadReciter, saveReciter } from '@/lib/reciters';
+import {
+  RATINGS,
+  loadLogs,
+  mergeLogs,
+  saveLogs,
+  type SessionLog,
+  type SessionRating,
+} from '@/lib/sessions';
 import { computeStats } from '@/lib/stats';
 import {
   TOTAL_PAGES,
@@ -40,9 +48,12 @@ import {
   fetchMyLinkedStudents,
   fetchMyTeachers,
   fetchRemoteMarks,
+  deleteRemoteLog,
+  fetchRemoteLogs,
   getDeviceId,
   getSessionUser,
   getSupabase,
+  pushLogs,
   pushMarks,
   removeTeacherLink,
   setIdentity,
@@ -145,6 +156,26 @@ export default function Home() {
     iter: number;
     round: number;
   } | null>(null);
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
+  const [logOpen, setLogOpen] = useState(false);
+  const [logSurah, setLogSurah] = useState(1);
+  const [logFrom, setLogFrom] = useState('1');
+  const [logTo, setLogTo] = useState('1');
+  const [logRating, setLogRating] = useState<SessionRating>('excellent');
+  const [logMsg, setLogMsg] = useState('');
+  const [circleOpen, setCircleOpen] = useState(false);
+  const [circleRows, setCircleRows] = useState<
+    | {
+        id: string;
+        name: string;
+        lastDate: string | null;
+        weekMarks: number;
+        repeated: number;
+        lastRating: SessionRating | null;
+        attention: boolean;
+      }[]
+    | null
+  >(null);
   const [noteDraft, setNoteDraft] = useState('');
   const [noteSaved, setNoteSaved] = useState(false);
   const hifzStopRef = useRef(true);
@@ -274,6 +305,18 @@ export default function Home() {
     if (identityRef.current === identity) setSyncState(ok ? 'ok' : 'error');
   }, []);
 
+  // مزامنة سجلّ الجلسات لنفس الهوية (دمج ورفع الناقص)
+  const syncLogsFor = useCallback(async (identity: string, local: SessionLog[]) => {
+    if (!getSupabase()) return;
+    const remote = await fetchRemoteLogs(identity);
+    if (remote === null || identityRef.current !== identity) return;
+    const all = mergeLogs(local, remote);
+    setSessionLogs(all);
+    saveLogs(identity, all);
+    const remoteIds = new Set(remote.map((l) => l.id));
+    await pushLogs(identity, all.filter((l) => !remoteIds.has(l.id)));
+  }, []);
+
   // التبديل بين مصحف المالكة وملفات الطلاب: كل هوية لها علاماتها وجلساتها وطبقاتها
   const switchProfile = useCallback(
     (studentId: string | null) => {
@@ -294,9 +337,12 @@ export default function Home() {
       } catch {
         setHiddenDates(new Set());
       }
+      const localLogs = loadLogs(identity);
+      setSessionLogs(localLogs);
       syncFor(identity, local);
+      syncLogsFor(identity, localLogs);
     },
-    [syncFor]
+    [syncFor, syncLogsFor]
   );
 
   // تبنّي بيانات الجهاز عند أول دخول بالحساب: دمج علامات الجهاز في الحساب (مرة واحدة لكل حساب)
@@ -393,11 +439,20 @@ export default function Home() {
     ch.on('broadcast', { event: 'marks-changed' }, async () => {
       // السحابة مصدر الحقيقة هنا: استبدال لا دمج، حتى لا يعود المحذوف من النسخة المحلية
       const identity = identityRef.current;
-      const remote = await fetchRemoteMarks(identity);
-      if (remote === null || identityRef.current !== identity) return;
-      setMarks(remote);
-      saveMarks(identity, remote);
-      setSyncState('ok');
+      const [remote, remoteLogs] = await Promise.all([
+        fetchRemoteMarks(identity),
+        fetchRemoteLogs(identity),
+      ]);
+      if (identityRef.current !== identity) return;
+      if (remote !== null) {
+        setMarks(remote);
+        saveMarks(identity, remote);
+        setSyncState('ok');
+      }
+      if (remoteLogs !== null) {
+        setSessionLogs(mergeLogs([], remoteLogs));
+        saveLogs(identity, remoteLogs);
+      }
     }).subscribe();
     liveChannelRef.current = ch;
     return () => {
@@ -786,6 +841,106 @@ export default function Home() {
     [chapterMap]
   );
 
+  // إضافة سجلّ جلسة (النطاق + التقييم) للهوية النشطة
+  const addSessionLog = () => {
+    const norm = (s: string) =>
+      Number(s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))));
+    const maxAyah = chapterMap.get(logSurah)?.verses ?? 286;
+    const from = norm(logFrom);
+    const to = norm(logTo);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > maxAyah) {
+      setLogMsg(`أدخلي آيات بين ١ و${toArabicDigits(maxAyah)}`);
+      return;
+    }
+    if (to < from) {
+      setLogMsg('آية النهاية قبل آية البداية');
+      return;
+    }
+    const entry: SessionLog = {
+      id: crypto.randomUUID(),
+      date: sessionDate,
+      surah: logSurah,
+      fromAyah: from,
+      toAyah: to,
+      rating: logRating,
+      createdAt: Date.now(),
+    };
+    const all = mergeLogs(sessionLogs, [entry]);
+    setSessionLogs(all);
+    saveLogs(identityRef.current, all);
+    setLogMsg('');
+    setLogOpen(false);
+    if (getSupabase()) {
+      pushLogs(identityRef.current, [entry]).then((ok) => {
+        if (ok) broadcastChange();
+      });
+    }
+  };
+
+  const removeSessionLog = (id: string) => {
+    const all = sessionLogs.filter((l) => l.id !== id);
+    setSessionLogs(all);
+    saveLogs(identityRef.current, all);
+    if (getSupabase()) {
+      deleteRemoteLog(identityRef.current, id).then((ok) => {
+        if (ok) broadcastChange();
+      });
+    }
+  };
+
+  // لوحة الحلقة: ملخّص كل الطالبات دفعة واحدة (المحتاجات للمتابعة أولاً)
+  const openCircle = async () => {
+    setCircleOpen(true);
+    setCircleRows(null);
+    const weekStart = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 6);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${d.getFullYear()}-${m}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const rows = await Promise.all(
+      allStudents.map(async (s) => {
+        const [sMarks, sLogs] = await Promise.all([
+          fetchRemoteMarks(s.id),
+          fetchRemoteLogs(s.id),
+        ]);
+        const marksList = sMarks ?? [];
+        const logsList = sLogs ?? [];
+        const dates = [
+          ...marksList.map((m) => m.date),
+          ...logsList.map((l) => l.date),
+        ].sort();
+        const lastDate = dates[dates.length - 1] ?? null;
+        const weekMarks = marksList.filter((m) => m.date >= weekStart).length;
+        const wordDates = new Map<string, Set<string>>();
+        for (const m of marksList) {
+          const set = wordDates.get(m.wordId) ?? new Set<string>();
+          set.add(m.date);
+          wordDates.set(m.wordId, set);
+        }
+        let repeated = 0;
+        for (const set of wordDates.values()) if (set.size >= 2) repeated += 1;
+        const sorted = [...logsList].sort(
+          (a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt
+        );
+        const lastRating = sorted[sorted.length - 1]?.rating ?? null;
+        const stale = !lastDate || lastDate < weekStart;
+        const attention = stale || weekMarks >= 10 || lastRating === 'redo';
+        return {
+          id: s.id,
+          name: s.name,
+          lastDate,
+          weekMarks,
+          repeated,
+          lastRating,
+          attention,
+        };
+      })
+    );
+    rows.sort((a, b) => Number(b.attention) - Number(a.attention));
+    setCircleRows(rows);
+  };
+
   // مكرِّر الحفظ: تشغيل نطاق آيات، كل آية تتكرر N مرة، والمجموعة كلها لعدد جولات
   const stopHifz = useCallback(() => {
     hifzStopRef.current = true;
@@ -1038,6 +1193,11 @@ export default function Home() {
         <button className="tool-btn" onClick={() => setStatsOpen(true)}>
           📊 الإحصاءات
         </button>
+        {allStudents.length > 0 && (
+          <button className="tool-btn" onClick={openCircle}>
+            👩‍🏫 الحلقة
+          </button>
+        )}
       </div>
 
       {/* شريط الملفات: أرصد في مصحفي أو مصحف أحد طلابي */}
@@ -1118,6 +1278,23 @@ export default function Home() {
             <i className="online-dot" /> المتواجدون الآن: {toArabicDigits(onlineCount)}
           </span>
         )}
+        <button
+          className="log-session-btn"
+          onClick={() => {
+            const first = data?.verses[0];
+            if (first) {
+              const [s, a1] = first.key.split(':').map(Number);
+              setLogSurah(s);
+              setLogFrom(String(a1));
+              const same = data!.verses.filter((v) => v.chapter === s);
+              setLogTo(same[same.length - 1].key.split(':')[1]);
+            }
+            setLogMsg('');
+            setLogOpen(true);
+          }}
+        >
+          📋 تقييم الجلسة
+        </button>
         {syncState !== 'off' && (
           <button
             className="link-devices-btn"
@@ -1147,7 +1324,7 @@ export default function Home() {
 
         {layersOpen && (
           <div className="layers-body">
-            {layers.length === 0 ? (
+            {layers.length === 0 && sessionLogs.length === 0 ? (
               <p className="layers-empty">
                 لا توجد جلسات بعد — ارصدي أول خطأ وستظهر جلسة اليوم هنا،
                 وتقدرين تخفين أخطاء أي جلسة أو تظهرينها متى شئتِ.
@@ -1164,22 +1341,69 @@ export default function Home() {
                 </div>
                 {layers.map((l) => {
                   const hidden = hiddenDates.has(l.date);
+                  const dayLogs = sessionLogs.filter((g) => g.date === l.date);
                   return (
-                    <button
-                      key={l.date}
-                      className={`layer-row ${hidden ? 'hidden-layer' : ''}`}
-                      onClick={() => toggleLayer(l.date)}
-                      title={hidden ? 'إظهار أخطاء هذه الجلسة' : 'إخفاء أخطاء هذه الجلسة'}
-                    >
-                      <span className="layer-eye">{hidden ? '◡' : '👁'}</span>
-                      <span className="layer-date">
-                        {formatArabicDate(l.date)}
-                        {l.date === sessionDate && <em> — الجلسة الحالية</em>}
-                      </span>
-                      <span className="layer-count">{arabicWordCount(l.count)}</span>
-                    </button>
+                    <div key={l.date} className="layer-group">
+                      <button
+                        className={`layer-row ${hidden ? 'hidden-layer' : ''}`}
+                        onClick={() => toggleLayer(l.date)}
+                        title={hidden ? 'إظهار أخطاء هذه الجلسة' : 'إخفاء أخطاء هذه الجلسة'}
+                      >
+                        <span className="layer-eye">{hidden ? '◡' : '👁'}</span>
+                        <span className="layer-date">
+                          {formatArabicDate(l.date)}
+                          {l.date === sessionDate && <em> — الجلسة الحالية</em>}
+                        </span>
+                        <span className="layer-count">{arabicWordCount(l.count)}</span>
+                      </button>
+                      {dayLogs.map((g) => (
+                        <div key={g.id} className="session-log-row">
+                          <span
+                            className="session-log-rating"
+                            style={{ color: RATINGS[g.rating].color, background: RATINGS[g.rating].bg }}
+                          >
+                            {RATINGS[g.rating].emoji} {RATINGS[g.rating].label}
+                          </span>
+                          <span className="session-log-range">
+                            {chapterMap.get(g.surah)?.name ?? g.surah} {toArabicDigits(g.fromAyah)}
+                            –{toArabicDigits(g.toAyah)}
+                          </span>
+                          <button
+                            className="student-remove"
+                            title="حذف هذا السجل"
+                            onClick={() => removeSessionLog(g.id)}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   );
                 })}
+                {/* سجلات جلسات بلا أخطاء (جلسة كاملة صحيحة!) */}
+                {sessionLogs
+                  .filter((g) => !layers.some((l) => l.date === g.date))
+                  .map((g) => (
+                    <div key={g.id} className="session-log-row perfect">
+                      <span
+                        className="session-log-rating"
+                        style={{ color: RATINGS[g.rating].color, background: RATINGS[g.rating].bg }}
+                      >
+                        {RATINGS[g.rating].emoji} {RATINGS[g.rating].label}
+                      </span>
+                      <span className="session-log-range">
+                        {formatArabicDate(g.date)} · {chapterMap.get(g.surah)?.name ?? g.surah}{' '}
+                        {toArabicDigits(g.fromAyah)}–{toArabicDigits(g.toAyah)} · بلا أخطاء ✨
+                      </span>
+                      <button
+                        className="student-remove"
+                        title="حذف هذا السجل"
+                        onClick={() => removeSessionLog(g.id)}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))}
               </>
             )}
           </div>
@@ -1382,6 +1606,144 @@ export default function Home() {
                 disabled={!!exportBusy}
               >
                 إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* تقييم الجلسة: النطاق المسمَّع + التقييم */}
+      {logOpen && (
+        <div className="export-backdrop" onClick={() => setLogOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>📋 تقييم جلسة {toArabicDigits(sessionDate)}</h2>
+            <p className="export-hint">
+              سجّلي وش سمّعت {activeName ? `${activeName} ` : ''}اليوم وقيّمي الأداء —
+              يظهر السجل في «جلسات التسميع» وفي لوحة الحلقة.
+            </p>
+            <label className="sync-code-label">
+              السورة:
+              <select
+                value={logSurah}
+                onChange={(e) => {
+                  setLogSurah(Number(e.target.value));
+                  setLogFrom('1');
+                  setLogTo('1');
+                }}
+              >
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {toArabicDigits(c.id)}. {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="export-range">
+              <label>
+                من آية
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={logFrom}
+                  onChange={(e) => setLogFrom(e.target.value)}
+                />
+              </label>
+              <label>
+                إلى آية
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={logTo}
+                  onChange={(e) => setLogTo(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="rating-row">
+              {(Object.keys(RATINGS) as SessionRating[]).map((r) => (
+                <button
+                  key={r}
+                  className={`rating-btn ${logRating === r ? 'active' : ''}`}
+                  style={{ color: RATINGS[r].color, background: RATINGS[r].bg }}
+                  onClick={() => setLogRating(r)}
+                >
+                  {RATINGS[r].emoji} {RATINGS[r].label}
+                </button>
+              ))}
+            </div>
+            {logMsg && <p className="export-error">⚠️ {logMsg}</p>}
+            <div className="export-actions">
+              <button className="nav-btn" onClick={addSessionLog}>
+                💾 حفظ السجل
+              </button>
+              <button className="cancel-btn" onClick={() => setLogOpen(false)}>
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* لوحة الحلقة: كل الطالبات في نظرة واحدة */}
+      {circleOpen && (
+        <div className="export-backdrop" onClick={() => setCircleOpen(false)}>
+          <div
+            className="export-dialog controls stats-dialog"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2>👩‍🏫 لوحة الحلقة</h2>
+            {circleRows === null ? (
+              <p className="layers-empty">⏳ يجمع بيانات الطالبات…</p>
+            ) : (
+              <>
+                <p className="export-hint">
+                  {toArabicDigits(circleRows.length)} من الطلاب — من يحتاج متابعة
+                  يظهر أولاً بعلامة 🔴 (لم يسمّع من أسبوع، أو أخطاء الأسبوع ≥ ١٠،
+                  أو آخر تقييم «يحتاج إعادة»).
+                </p>
+                <div className="students-list circle-list">
+                  {circleRows.map((r) => (
+                    <div key={r.id} className={`circle-row ${r.attention ? 'attention' : ''}`}>
+                      <div className="circle-row-head">
+                        <span className="student-name">
+                          {r.attention ? '🔴' : '🟢'} 🎓 {r.name}
+                        </span>
+                        {r.lastRating && (
+                          <span
+                            className="session-log-rating"
+                            style={{
+                              color: RATINGS[r.lastRating].color,
+                              background: RATINGS[r.lastRating].bg,
+                            }}
+                          >
+                            {RATINGS[r.lastRating].emoji} {RATINGS[r.lastRating].label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="circle-row-meta">
+                        <span>
+                          آخر جلسة:{' '}
+                          {r.lastDate ? formatArabicDate(r.lastDate) : 'لم تسمّع بعد'}
+                        </span>
+                        <span>أخطاء الأسبوع: {toArabicDigits(r.weekMarks)}</span>
+                        <span>متكرّرة: {toArabicDigits(r.repeated)}</span>
+                      </div>
+                      <button
+                        className="jump-btn"
+                        onClick={() => {
+                          switchProfile(r.id);
+                          setCircleOpen(false);
+                        }}
+                      >
+                        فتح مصحفها ↗
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setCircleOpen(false)}>
+                إغلاق
               </button>
             </div>
           </div>

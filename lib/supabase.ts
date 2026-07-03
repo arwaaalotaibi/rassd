@@ -99,6 +99,72 @@ export async function getSessionUser(): Promise<User | null> {
   return data.session?.user ?? null;
 }
 
+// ————— سجلّ جلسات التسميع —————
+
+import type { SessionLog, SessionRating } from './sessions';
+
+type LogRow = {
+  id: string;
+  device_id: string;
+  date: string;
+  surah: number;
+  from_ayah: number;
+  to_ayah: number;
+  rating: SessionRating;
+  created_at: string;
+};
+
+function rowToLog(r: LogRow): SessionLog {
+  return {
+    id: r.id,
+    date: r.date,
+    surah: r.surah,
+    fromAyah: r.from_ayah,
+    toAyah: r.to_ayah,
+    rating: r.rating,
+    createdAt: new Date(r.created_at).getTime(),
+  };
+}
+
+export async function fetchRemoteLogs(identity: string): Promise<SessionLog[] | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data, error } = await sb
+    .from('session_logs')
+    .select('*')
+    .eq('device_id', identity);
+  if (error) return null;
+  return (data as LogRow[]).map(rowToLog);
+}
+
+export async function pushLogs(identity: string, logs: SessionLog[]): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb || logs.length === 0) return !!sb;
+  const rows = logs.map((l) => ({
+    id: l.id,
+    device_id: identity,
+    date: l.date,
+    surah: l.surah,
+    from_ayah: l.fromAyah,
+    to_ayah: l.toAyah,
+    rating: l.rating,
+    created_at: new Date(l.createdAt).toISOString(),
+  }));
+  const { error } = await sb.from('session_logs').upsert(rows, { onConflict: 'id' });
+  return !error;
+}
+
+export async function deleteRemoteLog(identity: string, id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const { error } = await sb
+    .from('session_logs')
+    .delete()
+    .eq('device_id', identity)
+    .eq('id', id);
+  return !error;
+}
+
 // ————— روابط المعلّم والطالب (للحسابات المسجَّلة) —————
 
 export type TeacherLink = {
