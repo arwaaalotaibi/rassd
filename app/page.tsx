@@ -1069,13 +1069,17 @@ export default function Home() {
     <main className="app-root flex-1 flex flex-col items-center gap-5 px-4 py-6">
       {/* الترويسة */}
       <header className="w-full max-w-xl flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-extrabold" style={{ color: 'var(--green-deep)' }}>
-            📖 رصد
-          </h1>
-          <p className="text-xs font-semibold opacity-70">
-            مصحف إلكتروني — رواية حفص عن عاصم
-          </p>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="رصد" className="brand-logo" />
+          <div>
+            <h1 className="text-2xl font-extrabold" style={{ color: 'var(--green-deep)' }}>
+              رصد
+            </h1>
+            <p className="text-xs font-semibold opacity-70">
+              مصحف إلكتروني — رواية حفص عن عاصم
+            </p>
+          </div>
         </div>
         {user ? (
           <div className="account-chip">

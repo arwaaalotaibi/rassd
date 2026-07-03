@@ -404,6 +404,20 @@ body {
   font-size: 12px;
 }
 
+/* ————— الشعار ————— */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(13, 69, 52, 0.3);
+}
+
 /* ————— الحساب ————— */
 .google-btn {
   display: inline-flex;
