@@ -6,12 +6,6 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: "IndopakNastaleeq";
-  src: url("/fonts/IndopakNastaleeq.woff2") format("woff2");
-  font-display: swap;
-}
-
 :root {
   --paper: #fdfaf1;
   --paper-deep: #f6efdd;
@@ -98,21 +92,6 @@ body {
 .mushaf-line.centered {
   justify-content: center;
   gap: 0.32em;
-}
-
-/* المخطط الباكستاني: خط نستعليق بمقاس أنسب لارتفاعه */
-.mushaf-page.indopak .mushaf-line {
-  font-family: "IndopakNastaleeq", serif;
-  font-size: 3.9cqw;
-  line-height: 1.35;
-}
-
-.mushaf-page.indopak .basmala-line {
-  font-size: 3.7cqw;
-}
-
-.mushaf-page.indopak .ayah-end {
-  font-family: "UthmanicHafs", serif;
 }
 
 /* صفحتا الفاتحة وبداية البقرة: إطار مزخرف مُوسَّط في منتصف الصفحة */
@@ -1316,81 +1295,6 @@ body {
   border-inline-start: 3px solid var(--gold);
   border-radius: 6px;
   padding: 3px 8px;
-}
-
-/* ————— اختيار نوع المصحف ————— */
-.mushaf-choice {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: start;
-  background: rgba(20, 97, 74, 0.04);
-  border: 1.5px solid var(--gold-soft);
-  border-radius: 14px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: border-color 120ms ease, background-color 120ms ease;
-}
-
-.mushaf-choice:hover {
-  border-color: var(--gold);
-  background: rgba(184, 145, 47, 0.08);
-}
-
-.mushaf-choice.active {
-  border-color: var(--green);
-  background: rgba(20, 97, 74, 0.09);
-  box-shadow: 0 0 0 2px rgba(20, 97, 74, 0.15);
-}
-
-.mushaf-choice-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 14px;
-  color: var(--green-deep);
-}
-
-.mushaf-choice-head em {
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--paper);
-  background: var(--green);
-  border-radius: 999px;
-  padding: 1px 10px;
-}
-
-.mushaf-choice-meta {
-  font-size: 11.5px;
-  font-weight: 700;
-  opacity: 0.7;
-}
-
-.mushaf-choice-sample {
-  font-size: 22px;
-  color: var(--ink);
-  text-align: center;
-  background: var(--paper);
-  border: 1px dashed var(--gold-soft);
-  border-radius: 10px;
-  padding: 8px 6px;
-  line-height: 1.6;
-}
-
-.font-uthmani {
-  font-family: 'UthmanicHafs', serif;
-}
-
-.font-indopak {
-  font-family: 'IndopakNastaleeq', serif;
-}
-
-.mushaf-choice-ref {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--gold);
-  text-align: center;
 }
 
 /* ————— شريط الأدوات ————— */
