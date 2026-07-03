@@ -796,7 +796,7 @@ export default function Home() {
     const from = norm(hifzFrom);
     const to = norm(hifzTo);
     const repeat = norm(hifzRepeat);
-    const rounds = norm(hifzRounds);
+    const rounds = hifzRounds === 'inf' ? Infinity : norm(hifzRounds);
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > maxAyah) {
       setHifzMsg(`أدخلي آيات بين ١ و${toArabicDigits(maxAyah)}`);
       return;
@@ -805,8 +805,8 @@ export default function Home() {
       setHifzMsg('آية النهاية قبل آية البداية');
       return;
     }
-    if (!Number.isInteger(repeat) || repeat < 1 || repeat > 50 || !Number.isInteger(rounds) || rounds < 1 || rounds > 20) {
-      setHifzMsg('التكرار من ١ إلى ٥٠، والجولات من ١ إلى ٢٠');
+    if (!Number.isInteger(repeat) || repeat < 1 || repeat > 50) {
+      setHifzMsg('تكرار كل آية من ١ إلى ٥٠');
       return;
     }
     setHifzMsg('');
@@ -1260,8 +1260,11 @@ export default function Home() {
             🎧 {chapterMap.get(hifzSurah)?.name ?? ''} — الآية{' '}
             {toArabicDigits(hifzStatus.ayah)} · تكرار {toArabicDigits(hifzStatus.iter)}/
             {toArabicDigits(Number(hifzRepeat) || 1)}
-            {Number(hifzRounds) > 1 &&
-              ` · جولة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`}
+            {hifzRounds === 'inf'
+              ? ` · الإعادة ${toArabicDigits(hifzStatus.round)} ∞`
+              : Number(hifzRounds) > 1
+                ? ` · الإعادة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`
+                : ''}
           </span>
           <button className="hifz-bar-stop" onClick={stopHifz}>
             ⏹ إيقاف
@@ -1328,7 +1331,8 @@ export default function Home() {
             <h2>🎧 مكرِّر الحفظ</h2>
             <p className="export-hint">
               اختاري الآيات وعدد التكرار، واتركي التلاوة تعيد عليك — كل آية تتكرر
-              العدد المحدّد، ثم تنتقل للتي بعدها، والمجموعة كلها تُعاد بعدد الجولات.
+              العدد المحدّد ثم تنتقل للتي بعدها، والمقطع كاملاً يُعاد بالعدد الذي
+              تختارينه أو بلا توقف حتى توقفينه.
             </p>
             <label className="sync-code-label">
               السورة:
@@ -1378,13 +1382,15 @@ export default function Home() {
                 />
               </label>
               <label>
-                جولات المجموعة
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={hifzRounds}
-                  onChange={(e) => setHifzRounds(e.target.value)}
-                />
+                إعادة المقطع كاملاً
+                <select value={hifzRounds} onChange={(e) => setHifzRounds(e.target.value)}>
+                  <option value="1">مرة واحدة</option>
+                  <option value="2">مرتين</option>
+                  <option value="3">٣ مرات</option>
+                  <option value="5">٥ مرات</option>
+                  <option value="10">١٠ مرات</option>
+                  <option value="inf">∞ بلا توقف — حتى أوقفها</option>
+                </select>
               </label>
             </div>
             {hifzMsg && <p className="export-error">⚠️ {hifzMsg}</p>}
@@ -1392,8 +1398,11 @@ export default function Home() {
               <p className="hifz-status">
                 ▶️ الآية {toArabicDigits(hifzStatus.ayah)} — التكرار{' '}
                 {toArabicDigits(hifzStatus.iter)}/{toArabicDigits(Number(hifzRepeat) || 1)}
-                {Number(hifzRounds) > 1 &&
-                  ` — الجولة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`}
+                {hifzRounds === 'inf'
+                  ? ` — الإعادة ${toArabicDigits(hifzStatus.round)} ∞`
+                  : Number(hifzRounds) > 1
+                    ? ` — الإعادة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`
+                    : ''}
               </p>
             )}
             <div className="export-actions">
