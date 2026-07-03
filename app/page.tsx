@@ -24,6 +24,7 @@ import {
   saveStudents,
   type StudentProfile,
 } from '@/lib/profiles';
+import { RECITERS, ayahAudioUrl, loadReciter, saveReciter } from '@/lib/reciters';
 import { computeStats } from '@/lib/stats';
 import {
   TOTAL_PAGES,
@@ -146,6 +147,7 @@ export default function Home() {
   } | null>(null);
   const hifzStopRef = useRef(true);
   const pageRef = useRef(1);
+  const [reciter, setReciter] = useState('Alafasy');
   const [liveIdentity, setLiveIdentity] = useState('');
   const liveChannelRef = useRef<ReturnType<
     NonNullable<ReturnType<typeof getSupabase>>['channel']
@@ -323,6 +325,7 @@ export default function Home() {
   useEffect(() => {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
+    setReciter(loadReciter());
     fetch('/quran/chapters.json')
       .then((r) => r.json())
       .then(setChapters);
@@ -813,7 +816,6 @@ export default function Home() {
     setPlayingAyah(null);
     setHifzOpen(false); // التلاوة على المصحف نفسه، لا داخل النافذة
     hifzStopRef.current = false;
-    const pad = (n: number) => String(n).padStart(3, '0');
     outer: for (let round = 1; round <= rounds; round++) {
       for (let a = from; a <= to; a++) {
         if (hifzStopRef.current) break outer;
@@ -826,9 +828,7 @@ export default function Home() {
           setHifzStatus({ ayah: a, iter: i, round });
           await new Promise<void>((resolve) => {
             audioRef.current?.pause();
-            const audio = new Audio(
-              `https://verses.quran.com/Alafasy/mp3/${pad(hifzSurah)}${pad(a)}.mp3`
-            );
+            const audio = new Audio(ayahAudioUrl(reciter, hifzSurah, a));
             audioRef.current = audio;
             audio.onended = () => resolve();
             audio.onerror = () => resolve();
@@ -841,7 +841,7 @@ export default function Home() {
     setHifzStatus(null);
   };
 
-  // سماع الآية بصوت العفاسي (CDN تلاوات quran.com المجاني) — ضغطة تشغّل وضغطة توقف
+  // سماع الآية بصوت القارئ المختار (CDN تلاوات quran.com المجاني) — ضغطة تشغّل وضغطة توقف
   const toggleAyahAudio = useCallback(
     (surah: number, ayah: number) => {
       const key = `${surah}:${ayah}`;
@@ -852,17 +852,14 @@ export default function Home() {
         return;
       }
       audioRef.current?.pause();
-      const pad = (n: number) => String(n).padStart(3, '0');
-      const audio = new Audio(
-        `https://verses.quran.com/Alafasy/mp3/${pad(surah)}${pad(ayah)}.mp3`
-      );
+      const audio = new Audio(ayahAudioUrl(reciter, surah, ayah));
       audioRef.current = audio;
       setPlayingAyah(key);
       audio.onended = () => setPlayingAyah(null);
       audio.onerror = () => setPlayingAyah(null);
       audio.play().catch(() => setPlayingAyah(null));
     },
-    [playingAyah]
+    [playingAyah, reciter]
   );
 
   const currentChapter = data?.verses[0]?.chapter ?? 1;
@@ -1334,6 +1331,22 @@ export default function Home() {
               العدد المحدّد ثم تنتقل للتي بعدها، والمقطع كاملاً يُعاد بالعدد الذي
               تختارينه أو بلا توقف حتى توقفينه.
             </p>
+            <label className="sync-code-label">
+              القارئ:
+              <select
+                value={reciter}
+                onChange={(e) => {
+                  setReciter(e.target.value);
+                  saveReciter(e.target.value);
+                }}
+              >
+                {RECITERS.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    🎙️ {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="sync-code-label">
               السورة:
               <select
