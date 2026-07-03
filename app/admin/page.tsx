@@ -7,6 +7,14 @@ import { toArabicDigits, type Chapter } from '@/lib/quran';
 import { getSupabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 
+type FeedbackItem = {
+  id: number;
+  message: string;
+  contact: string;
+  device_id: string;
+  at: string;
+};
+
 type AdminStats = {
   identities: number;
   accounts: number;
@@ -30,6 +38,15 @@ export default function AdminPage() {
   const [announceMsg, setAnnounceMsg] = useState('');
   const [deleteId, setDeleteId] = useState('');
   const [deleteMsg, setDeleteMsg] = useState('');
+  const [inbox, setInbox] = useState<FeedbackItem[]>([]);
+
+  const loadInbox = () => {
+    getSupabase()
+      ?.rpc('admin_feedback')
+      .then(({ data }) => {
+        if (Array.isArray(data)) setInbox(data as FeedbackItem[]);
+      });
+  };
 
   useEffect(() => {
     fetch('/quran/chapters.json')
@@ -48,7 +65,9 @@ export default function AdminPage() {
         return;
       }
       setStats(data as AdminStats);
+      loadInbox();
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const publish = async () => {
@@ -210,6 +229,39 @@ export default function AdminPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      {/* الملاحظات الواردة */}
+      <section className="admin-card">
+        <h2>📮 ملاحظات المستخدمين ({toArabicDigits(inbox.length)})</h2>
+        {inbox.length === 0 ? (
+          <p className="admin-note">لا ملاحظات بعد — أول ما يرسل أحد تظهر هنا.</p>
+        ) : (
+          <div className="admin-inbox">
+            {inbox.map((f) => (
+              <div key={f.id} className="feedback-item">
+                <p className="feedback-message">{f.message}</p>
+                <div className="feedback-meta">
+                  <span>🗓 {toArabicDigits(f.at)}</span>
+                  {f.contact && <span dir="ltr">📞 {f.contact}</span>}
+                  <span dir="ltr" className="feedback-sender">
+                    {f.device_id.slice(0, 8)}…
+                  </span>
+                  <button
+                    className="student-remove"
+                    title="حذف الملاحظة"
+                    onClick={async () => {
+                      await getSupabase()?.rpc('admin_delete_feedback', { fid: f.id });
+                      loadInbox();
+                    }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* الإعلان العام */}

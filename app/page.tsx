@@ -166,6 +166,12 @@ export default function Home() {
   const [announcement, setAnnouncement] = useState<{ id: number; message: string } | null>(
     null
   );
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportMsg, setSupportMsg] = useState('');
+  const [supportContact, setSupportContact] = useState('');
+  const [supportState, setSupportState] = useState<'idle' | 'sending' | 'sent' | 'error'>(
+    'idle'
+  );
   const [circleOpen, setCircleOpen] = useState(false);
   const [circleRows, setCircleRows] = useState<
     | {
@@ -910,6 +916,27 @@ export default function Home() {
     }
   };
 
+  // إرسال ملاحظة دعم للمشرفة
+  const sendSupport = async () => {
+    const sb = getSupabase();
+    const msg = supportMsg.trim();
+    if (!sb || !msg) return;
+    setSupportState('sending');
+    // للمسجَّل هويته حسابه، وللضيف الهوية النشطة (تطابق ترويسة الأمان)
+    const { error } = await sb.from('feedback').insert({
+      device_id: user?.id ?? identityRef.current,
+      message: msg,
+      contact: supportContact.trim(),
+    });
+    if (error) {
+      setSupportState('error');
+      return;
+    }
+    setSupportState('sent');
+    setSupportMsg('');
+    setSupportContact('');
+  };
+
   // لوحة الحلقة: ملخّص كل الطالبات دفعة واحدة (المحتاجات للمتابعة أولاً)
   const openCircle = async () => {
     setCircleOpen(true);
@@ -1585,9 +1612,82 @@ export default function Home() {
         )}
       </div>
 
-      <footer className="text-xs opacity-60 font-semibold pb-2">
-        النص القرآني وفق مصحف المدينة النبوية — مجمع الملك فهد لطباعة المصحف الشريف
+      <footer className="app-footer">
+        <p className="text-xs opacity-60 font-semibold">
+          النص القرآني وفق مصحف المدينة النبوية — مجمع الملك فهد لطباعة المصحف الشريف
+        </p>
+        {syncState !== 'off' && (
+          <button
+            className="support-btn"
+            onClick={() => {
+              setSupportState('idle');
+              setSupportOpen(true);
+            }}
+          >
+            🛟 الدعم والملاحظات
+          </button>
+        )}
       </footer>
+
+      {/* نافذة الدعم والملاحظات */}
+      {supportOpen && (
+        <div className="export-backdrop" onClick={() => setSupportOpen(false)}>
+          <div className="export-dialog controls" onClick={(e) => e.stopPropagation()}>
+            <h2>🛟 الدعم والملاحظات</h2>
+            {supportState === 'sent' ? (
+              <>
+                <p className="import-ok">
+                  ✅ وصلت ملاحظتك — شكراً لك! نقرأ كل رسالة ونطوّر البرنامج بها.
+                </p>
+                <div className="export-actions">
+                  <button className="cancel-btn" onClick={() => setSupportOpen(false)}>
+                    إغلاق
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="export-hint">
+                  واجهتك مشكلة؟ عندك اقتراح؟ اكتبي ملاحظتك وسنقرؤها بإذن الله —
+                  وإن أحببتِ رداً اتركي وسيلة تواصل.
+                </p>
+                <textarea
+                  className="note-input"
+                  rows={4}
+                  placeholder="اكتبي ملاحظتك هنا…"
+                  value={supportMsg}
+                  onChange={(e) => setSupportMsg(e.target.value)}
+                />
+                <label className="sync-code-label">
+                  وسيلة تواصل (اختياري):
+                  <input
+                    type="text"
+                    dir="ltr"
+                    placeholder="إيميل أو جوال"
+                    value={supportContact}
+                    onChange={(e) => setSupportContact(e.target.value)}
+                  />
+                </label>
+                {supportState === 'error' && (
+                  <p className="export-error">⚠️ تعذّر الإرسال — تأكدي من الاتصال وجرّبي</p>
+                )}
+                <div className="export-actions">
+                  <button
+                    className="nav-btn"
+                    disabled={!supportMsg.trim() || supportState === 'sending'}
+                    onClick={sendSupport}
+                  >
+                    {supportState === 'sending' ? '⏳ يرسل…' : '📨 إرسال'}
+                  </button>
+                  <button className="cancel-btn" onClick={() => setSupportOpen(false)}>
+                    إلغاء
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* شريط مكرِّر الحفظ العائم — يظهر أثناء التلاوة على المصحف */}
       {hifzStatus && (
