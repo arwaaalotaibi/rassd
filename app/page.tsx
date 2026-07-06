@@ -637,8 +637,8 @@ export default function Home() {
     };
   }, [focusMode, hifzStatus, playingAyah]);
 
-  // السحب باللمس لتبديل الصفحات — نفس اتجاه أسهم الكيبورد:
-  // سحب لليسار = الصفحة التالية، سحب لليمين = السابقة (اتجاه تصفّح المصحف)
+  // السحب باللمس لتبديل الصفحات:
+  // من اليسار إلى اليمين = يزيد رقم الصفحة، والعكس ينقص
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const onPageTouchStart = useCallback((e: ReactTouchEvent) => {
     const t = e.touches[0];
@@ -654,7 +654,7 @@ export default function Home() {
       const dy = t.clientY - s.y;
       // سحب أفقي واضح فقط (لا يتعارض مع النقر على الكلمات ولا التمرير العمودي)
       if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-      go(dx < 0 ? pageRef.current + 1 : pageRef.current - 1);
+      go(dx > 0 ? pageRef.current + 1 : pageRef.current - 1);
     },
     [go]
   );
