@@ -64,7 +64,7 @@ import {
   type TeacherLink,
 } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 const pageCache = new Map<number, PageData>();
@@ -569,6 +569,28 @@ export default function Home() {
   const go = useCallback((p: number) => {
     if (p >= 1 && p <= TOTAL_PAGES) setPage(p);
   }, []);
+
+  // السحب باللمس لتبديل الصفحات — نفس اتجاه أسهم الكيبورد:
+  // سحب لليسار = الصفحة التالية، سحب لليمين = السابقة (اتجاه تصفّح المصحف)
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onPageTouchStart = useCallback((e: ReactTouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  }, []);
+  const onPageTouchEnd = useCallback(
+    (e: ReactTouchEvent) => {
+      const s = touchStart.current;
+      touchStart.current = null;
+      if (!s) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      // سحب أفقي واضح فقط (لا يتعارض مع النقر على الكلمات ولا التمرير العمودي)
+      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      go(dx < 0 ? pageRef.current + 1 : pageRef.current - 1);
+    },
+    [go]
+  );
 
   // أسهم الكيبورد: اليسار = الصفحة التالية (اتجاه المصحف)
   useEffect(() => {
@@ -1220,46 +1242,6 @@ export default function Home() {
         {authErr && <p className="export-error w-full">⚠️ {authErr}</p>}
       </header>
 
-      {/* أدوات التنقل */}
-      <div className="controls w-full max-w-xl flex flex-wrap items-center gap-2 justify-center">
-        <select
-          value={currentChapter}
-          onChange={(e) => {
-            const c = chapterMap.get(Number(e.target.value));
-            if (c) go(c.pages[0]);
-          }}
-          className="flex-1 min-w-36"
-          aria-label="اختيار السورة"
-        >
-          {chapters.map((c) => (
-            <option key={c.id} value={c.id}>
-              {toArabicDigits(c.id)}. {c.name}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="text"
-          inputMode="numeric"
-          placeholder={`صفحة ١-${toArabicDigits(TOTAL_PAGES)}`}
-          value={pageInput}
-          onChange={(e) => setPageInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submitPageInput()}
-          onBlur={() => pageInput && submitPageInput()}
-          className="w-28 text-center"
-          aria-label="الانتقال إلى صفحة"
-        />
-
-        <div className="flex gap-2">
-          <button className="nav-btn" onClick={() => go(page - 1)} disabled={page <= 1}>
-            ▶ السابقة
-          </button>
-          <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= TOTAL_PAGES}>
-            التالية ◀
-          </button>
-        </div>
-      </div>
-
       {/* شريط الأدوات: الاستماع والتصدير والإحصاءات بأزرار متساوية */}
       <div className="tools-bar w-full max-w-xl">
         <button
@@ -1515,8 +1497,53 @@ export default function Home() {
         )}
       </div>
 
+      {/* أدوات التنقل — فوق المصحف مباشرة */}
+      <div className="controls w-full max-w-xl flex flex-wrap items-center gap-2 justify-center">
+        <select
+          value={currentChapter}
+          onChange={(e) => {
+            const c = chapterMap.get(Number(e.target.value));
+            if (c) go(c.pages[0]);
+          }}
+          className="flex-1 min-w-36"
+          aria-label="اختيار السورة"
+        >
+          {chapters.map((c) => (
+            <option key={c.id} value={c.id}>
+              {toArabicDigits(c.id)}. {c.name}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder={`صفحة ١-${toArabicDigits(TOTAL_PAGES)}`}
+          value={pageInput}
+          onChange={(e) => setPageInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submitPageInput()}
+          onBlur={() => pageInput && submitPageInput()}
+          className="w-28 text-center"
+          aria-label="الانتقال إلى صفحة"
+        />
+
+        <div className="flex gap-2">
+          <button className="nav-btn" onClick={() => go(page - 1)} disabled={page <= 1}>
+            ▶ السابقة
+          </button>
+          <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= TOTAL_PAGES}>
+            التالية ◀
+          </button>
+        </div>
+      </div>
+
       {/* صفحة المصحف */}
-      <div className="w-full max-w-xl relative" ref={pageWrapRef}>
+      <div
+        className="w-full max-w-xl relative"
+        ref={pageWrapRef}
+        onTouchStart={onPageTouchStart}
+        onTouchEnd={onPageTouchEnd}
+      >
         {data && chapters.length > 0 ? (
           <MushafPage
             data={data}
