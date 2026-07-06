@@ -2083,9 +2083,15 @@ body.focus-lock { overflow: hidden; }
       color-mix(in srgb, var(--bg) 70%, #000) 0%, transparent 60%),
     var(--bg);
 }
-.reading-focus-stage .mushaf-frame {
+/* عرض المصحف داخل وضع التركيز: أكبر ما يسمح به الارتفاع مع نسبة الصفحة ٠٫٦٨
+   (يُضبط على الغلاف المتحرك لأن الإطار داخله عرضه ١٠٠٪ من أبيه) */
+.reading-focus-stage .mushaf-anim,
+.reading-focus-stage > .mushaf-frame {
+  width: min(100%, calc((100dvh - 90px) * 0.68));
   margin: auto;
-  max-width: min(100%, calc((100dvh - 24px) * 0.68));
+}
+.reading-focus-stage .mushaf-anim .mushaf-frame {
+  max-width: none;
 }
 .focus-exit {
   position: fixed;
