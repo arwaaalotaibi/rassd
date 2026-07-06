@@ -2065,41 +2065,33 @@ body,
   .mushaf-anim.anim-prev { animation: none; }
 }
 
-/* ═══════════ وضع القراءة المركّزة ═══════════ */
+/* ═══════════ المسرح: المصحف يملأ كل المساحة بين الشريطين ═══════════ */
 body.focus-lock { overflow: hidden; }
-.reading-focus-stage {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  margin: 0 !important;
-  max-width: none !important;
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  container-type: size;
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: max(12px, env(safe-area-inset-top)) 12px
-    max(12px, env(safe-area-inset-bottom));
-  background:
-    radial-gradient(1200px 600px at 50% -10%,
-      color-mix(in srgb, var(--bg) 70%, #000) 0%, transparent 60%),
-    var(--bg);
+  padding: 8px 10px;
 }
-/* المصحف داخل وضع التركيز يملأ الشاشة كاملة (آيفون/آيباد):
-   الصفحة تتحرر من نسبة ٠٫٦٨ وتتمدد طولاً وعرضاً، والأسطر تتوزع على الارتفاع.
-   على الشاشات العريضة جداً نحدّ العرض بنسبة من الارتفاع حتى لا تتشوه الأسطر */
-.reading-focus-stage .mushaf-anim,
-.reading-focus-stage > .mushaf-frame {
-  width: min(100%, calc((100dvh - 16px) * 0.8));
+/* الصفحة تتحرر من نسبة الورقة وتتمدد طولاً وعرضاً؛ وعلى الشاشات العريضة
+   نحدّ العرض بنسبة من ارتفاع المسرح حتى لا تتشوه الأسطر */
+.stage .mushaf-anim {
+  width: 100%; /* متصفحات قديمة بلا دعم cqh — عرض كامل بدل الانكماش */
+  width: min(100%, calc(100cqh * 0.78));
   height: 100%;
   margin-inline: auto;
 }
-.reading-focus-stage .mushaf-anim .mushaf-frame {
+.stage .mushaf-anim .mushaf-frame {
   max-width: none;
   height: 100%;
 }
-.reading-focus-stage .mushaf-frame-inner {
+.stage .mushaf-frame-inner {
   height: 100%;
 }
-.reading-focus-stage .mushaf-page {
+.stage .mushaf-page {
   aspect-ratio: auto !important;
   height: 100%;
 }
@@ -2119,10 +2111,10 @@ body.focus-lock { overflow: hidden; }
   backdrop-filter: blur(6px);
 }
 .focus-nav {
-  position: fixed;
+  position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 62;
+  z-index: 40;
   width: 44px;
   height: 66px;
   border-radius: 12px;
@@ -2134,8 +2126,12 @@ body.focus-lock { overflow: hidden; }
   backdrop-filter: blur(6px);
 }
 .focus-nav:disabled { opacity: 0.3; pointer-events: none; }
-.focus-prev { inset-inline-end: 8px; }
-.focus-next { inset-inline-start: 8px; }
+.focus-prev { inset-inline-end: 4px; }
+.focus-next { inset-inline-start: 4px; }
+/* شاشات اللمس: السحب يقلب الصفحات — لا حاجة للأسهم فوق المصحف */
+@media (pointer: coarse) {
+  .focus-nav { display: none; }
+}
 .focus-page {
   position: fixed;
   bottom: max(12px, env(safe-area-inset-bottom));
@@ -2149,4 +2145,239 @@ body.focus-lock { overflow: hidden; }
   background: color-mix(in srgb, var(--paper) 88%, transparent);
   border: 1.5px solid var(--gold-soft);
   backdrop-filter: blur(6px);
+}
+
+/* ═══════════ هيكل «المصحف هو الشاشة» ═══════════ */
+.app-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* الشريطان العلوي والسفلي: رفيعان وثابتا المحتوى */
+.top-bar,
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--paper);
+  padding-block: 7px;
+  padding-inline: max(10px, calc((100% - 700px) / 2));
+}
+.top-bar {
+  border-bottom: 1.5px solid var(--gold-soft);
+  padding-top: max(7px, env(safe-area-inset-top));
+}
+.bottom-bar {
+  border-top: 1.5px solid var(--gold-soft);
+  padding-bottom: max(7px, env(safe-area-inset-bottom));
+}
+.top-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.bar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-deep);
+  background: rgba(184, 145, 47, 0.1);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.bar-chip:hover {
+  background: rgba(184, 145, 47, 0.2);
+}
+.bar-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-size: 15px;
+  background: rgba(184, 145, 47, 0.1);
+  border: 1.5px solid var(--gold-soft);
+  cursor: pointer;
+}
+.bar-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.nav-chip {
+  min-width: 0;
+}
+.nav-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-chip-caret {
+  font-size: 10px;
+  opacity: 0.6;
+}
+.date-chip input[type='date'] {
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  width: 8.6em;
+}
+.count-chip {
+  background: rgba(192, 57, 43, 0.09);
+  border-color: rgba(192, 57, 43, 0.35);
+  color: #8b2f22;
+}
+.more-chip {
+  position: relative;
+  font-size: 17px;
+  line-height: 1;
+  padding-block: 4px;
+}
+.unread-dot {
+  position: absolute;
+  top: -2px;
+  inset-inline-start: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #d85a30;
+}
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: none;
+}
+.sync-dot.sync-ok { background: #22a06b; }
+.sync-dot.sync-syncing { background: var(--gold); }
+.sync-dot.sync-error { background: #e24b4a; }
+.sync-dot.sync-off { background: #b4b2a9; }
+
+/* ═══════════ الأوراق السفلية ═══════════ */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(33, 48, 31, 0.45);
+}
+.sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 56;
+  margin-inline: auto;
+  width: 100%;
+  max-width: 560px;
+  max-height: 84dvh;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  padding: 10px 16px max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: sheet-up 220ms ease;
+}
+@keyframes sheet-up {
+  from { transform: translateY(30%); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
+}
+.sheet-handle {
+  width: 40px;
+  height: 4.5px;
+  border-radius: 999px;
+  background: var(--gold-soft);
+  margin: 0 auto 2px;
+  flex: none;
+}
+.sheet-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--green-deep);
+  text-align: center;
+}
+.sheet-section {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-top: 2px;
+}
+.sheet-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.sheet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.sheet-tile {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-deep);
+  background: rgba(184, 145, 47, 0.1);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 11px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.sheet-tile:hover {
+  background: rgba(184, 145, 47, 0.2);
+}
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-row {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-align: start;
+  cursor: pointer;
+}
+.profile-row.active {
+  background: rgba(20, 97, 74, 0.1);
+  border-color: var(--green);
+  color: var(--green-deep);
+}
+.profile-row.manage {
+  opacity: 0.85;
+  border-style: dashed;
+}
+.sheet-account {
+  align-self: center;
+}
+.attribution {
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0.55;
+  text-align: center;
+}
+
+/* النوافذ الحوارية تتمرر داخلياً (الصفحة نفسها لم تعد تتمرر) */
+.export-dialog {
+  max-height: 88dvh;
+  overflow-y: auto;
 }

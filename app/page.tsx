@@ -36,6 +36,7 @@ import {
 import { computeStats } from '@/lib/stats';
 import {
   TOTAL_PAGES,
+  juzOfPage,
   toArabicDigits,
   type Chapter,
   type PageData,
@@ -94,6 +95,10 @@ export default function Home() {
   const [popover, setPopover] = useState<Popover | null>(null);
   const [hiddenDates, setHiddenDates] = useState<Set<string>>(new Set());
   const [layersOpen, setLayersOpen] = useState(false);
+  // أوراق الواجهة السفلية: التنقل، كل الأدوات، اختيار المصحف
+  const [navOpen, setNavOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
@@ -660,7 +665,13 @@ export default function Home() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       if (e.key === 'ArrowLeft') go(page + 1);
       if (e.key === 'ArrowRight') go(page - 1);
-      if (e.key === 'Escape') setPopover(null);
+      if (e.key === 'Escape') {
+        setPopover(null);
+        setNavOpen(false);
+        setMoreOpen(false);
+        setProfileOpen(false);
+        setLayersOpen(false);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -1230,7 +1241,7 @@ export default function Home() {
   };
 
   return (
-    <main className="app-root flex-1 flex flex-col items-center gap-5 px-4 py-6">
+    <main className="app-root app-shell">
       {/* إعلان الإدارة */}
       {announcement && (
         <div className="announce-bar w-full max-w-xl">
@@ -1247,232 +1258,67 @@ export default function Home() {
         </div>
       )}
 
-      {/* الترويسة */}
-      <header className="w-full max-w-xl flex flex-wrap items-center justify-between gap-2">
-        <div className="brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="رصد" className="brand-logo" />
-          <div>
-            <h1 className="text-2xl font-extrabold" style={{ color: 'var(--green-deep)' }}>
-              رصد
-            </h1>
-            <p className="text-xs font-semibold opacity-70">
-              مصحف إلكتروني — رواية حفص عن عاصم
-            </p>
-          </div>
-        </div>
-        {user ? (
-          <div className="account-chip">
-            {user.user_metadata?.avatar_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.user_metadata.avatar_url} alt="" className="account-avatar" />
-            )}
-            <span>{(user.user_metadata?.name as string)?.split(' ')[0] ?? 'حسابي'}</span>
-            <button
-              onClick={() => signOutAccount()}
-              title="تسجيل الخروج — يرجع البرنامج لوضع الضيف على هذا الجهاز"
-            >
-              خروج
-            </button>
-          </div>
-        ) : syncState !== 'off' ? (
-          <div className="flex gap-2 flex-wrap">
-            <button
-              className="google-btn"
-              onClick={async () => {
-                setAuthErr('');
-                const err = await signInWithGoogle();
-                if (err) setAuthErr(err);
-              }}
-            >
-              <span className="google-g">G</span> الدخول بـ Google
-            </button>
-            <button
-              className="google-btn"
-              onClick={() => {
-                setEmailVal('');
-                setOtpVal('');
-                setOtpSent(false);
-                setOtpMsg('');
-                setEmailOpen(true);
-              }}
-            >
-              ✉️ برمز إيميل
-            </button>
-          </div>
-        ) : null}
-        {authErr && <p className="export-error w-full">⚠️ {authErr}</p>}
-      </header>
-
-      {/* شريط الأدوات: الاستماع والتصدير والإحصاءات بأزرار متساوية */}
-      <div className="tools-bar w-full max-w-xl">
-        <button
-          className="tool-btn"
-          onClick={() => {
-            // تعبئة افتراضية من آيات الصفحة الحالية
-            const first = data?.verses[0];
-            const last = data?.verses[data.verses.length - 1];
-            if (first) {
-              const [s, a1] = first.key.split(':').map(Number);
-              setHifzSurah(s);
-              setHifzFrom(String(a1));
-              const sameSurah = data!.verses.filter((v) => v.chapter === s);
-              const a2 = Number(sameSurah[sameSurah.length - 1].key.split(':')[1]);
-              setHifzTo(String(a2));
-            } else if (last) {
-              setHifzSurah(last.chapter);
-            }
-            setHifzMsg('');
-            setHifzOpen(true);
-          }}
-        >
-          🎧 الاستماع
-        </button>
-        <button
-          className="tool-btn"
-          onClick={() => {
-            setExportFrom(String(page));
-            setExportTo(String(page));
-            setExportErr('');
-            setExportOpen(true);
-          }}
-        >
-          📄 تصدير PDF
-        </button>
-        <button className="tool-btn" onClick={() => setStatsOpen(true)}>
-          📊 الإحصاءات
-        </button>
-        {allStudents.length > 0 && (
-          <button className="tool-btn" onClick={openCircle}>
-            👩‍🏫 الحلقة
-          </button>
-        )}
-      </div>
-
-      {/* شريط الملفات: أرصد في مصحفي أو مصحف أحد طلابي */}
-      <div className="controls profile-bar w-full max-w-xl">
-        <label className="profile-label">
-          ✍️ أرصد في:
-          <select
-            value={activeStudent ?? ''}
-            onChange={(e) => {
-              if (e.target.value === '__manage') {
-                setStudentMsg('');
-                setStudentsOpen(true);
-                return;
-              }
-              switchProfile(e.target.value || null);
-            }}
-            aria-label="اختيار المصحف"
-          >
-            <option value="">👤 مصحفي</option>
-            {allStudents.map((s) => (
-              <option key={s.id} value={s.id}>
-                🎓 {s.name}
-              </option>
-            ))}
-            <option value="__manage">👥 إدارة طلابي…</option>
-          </select>
-        </label>
-        {activeName && (
-          <span className="student-active-badge">
-            الرصد يُحفظ في مصحف {activeName} ويظهر عنده مباشرة
-          </span>
-        )}
-      </div>
-
-      {/* شريط جلسة التسميع: التاريخ + دليل الألوان + عدّاد */}
-      <div className="controls session-bar w-full max-w-xl">
-        <label className="session-date">
-          📅 تاريخ الجلسة
-          <input
-            type="date"
-            value={sessionDate}
-            onChange={(e) => e.target.value && setSessionDate(e.target.value)}
-          />
-        </label>
-        <div className="legend">
-          {(Object.keys(ERROR_TYPES) as ErrorType[]).map((k) => (
-            <span
-              key={k}
-              className="legend-chip"
-              style={{ background: ERROR_TYPES[k].bg, borderColor: ERROR_TYPES[k].color }}
-            >
-              {ERROR_TYPES[k].label}
-            </span>
-          ))}
-        </div>
-        <span className="error-count">
-          كلمات مرصودة في الصفحة: {toArabicDigits(pageErrorCount)}
-        </span>
-        <span
-          className={`sync-badge sync-${syncState}`}
-          title={
-            syncState === 'ok'
-              ? 'الرصد محفوظ في السحابة'
-              : syncState === 'syncing'
-                ? 'جاري المزامنة…'
-                : syncState === 'error'
-                  ? 'تعذّرت المزامنة — الرصد محفوظ محلياً وسيُرفع لاحقاً'
-                  : 'الحفظ محلي فقط'
-          }
-        >
-          {syncState === 'ok' && '☁️ متزامن'}
-          {syncState === 'syncing' && '⏳ يزامن…'}
-          {syncState === 'error' && '⚠️ محلي'}
-          {syncState === 'off' && '💾 محلي'}
-        </span>
-        {onlineCount > 0 && (
-          <span className="online-badge" title="عدد المتواجدين في التطبيق الآن">
-            <i className="online-dot" /> المتواجدون الآن: {toArabicDigits(onlineCount)}
-          </span>
-        )}
-        <button
-          className="log-session-btn"
-          onClick={() => {
-            const first = data?.verses[0];
-            if (first) {
-              const [s, a1] = first.key.split(':').map(Number);
-              setLogSurah(s);
-              setLogFrom(String(a1));
-              const same = data!.verses.filter((v) => v.chapter === s);
-              setLogTo(same[same.length - 1].key.split(':')[1]);
-            }
-            setLogMsg('');
-            setLogOpen(true);
-          }}
-        >
-          📋 تقييم الجلسة
-        </button>
-        {syncState !== 'off' && (
+      {/* الشريط العلوي: التنقل والسمة والقراءة الصافية */}
+      {!focusMode && (
+        <header className="top-bar w-full">
           <button
-            className="link-devices-btn"
+            className="bar-chip nav-chip"
             onClick={() => {
-              setLinkInput('');
-              setLinkMsg('');
-              setCopied(false);
-              setLinkOpen(true);
+              setPageInput('');
+              setNavOpen(true);
             }}
+            aria-label="التنقل بين السور والصفحات"
           >
-            {user ? '🔗 رمزي' : '🔗 أجهزتي'}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="رصد" className="bar-logo" />
+            <span className="nav-chip-text">
+              {chapterMap.get(currentChapter)?.name ?? 'رصد'} · جـ
+              {toArabicDigits(juzOfPage(page))} · ص{toArabicDigits(page)}
+            </span>
+            <span className="nav-chip-caret">▾</span>
           </button>
-        )}
-      </div>
+          <div className="top-actions">
+            <button
+              className="bar-icon"
+              onClick={() =>
+                setTheme((t) => (t === 'light' ? 'dark' : t === 'dark' ? 'sepia' : 'light'))
+              }
+              title={
+                theme === 'light'
+                  ? 'التبديل إلى الوضع الليلي'
+                  : theme === 'dark'
+                    ? 'التبديل إلى الوضع الدافئ'
+                    : 'التبديل إلى الوضع الفاتح'
+              }
+              aria-label="تبديل سمة القراءة"
+            >
+              {theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '📖'}
+            </button>
+            <button
+              className="bar-icon"
+              onClick={() => setFocusMode(true)}
+              title="قراءة صافية — إخفاء كل الأدوات"
+              aria-label="قراءة صافية"
+            >
+              ⛶
+            </button>
+          </div>
+        </header>
+      )}
 
-      {/* لوحة الطبقات — كل تاريخ جلسة طبقة مستقلة */}
-      <div className="layers-panel w-full max-w-xl">
-        <button className="layers-header" onClick={() => setLayersOpen(!layersOpen)}>
-          <span>
-            🗓️ جلسات التسميع{' '}
-            {layers.length > 0 && (
-              <span className="layers-count">{toArabicDigits(layers.length)}</span>
-            )}
-          </span>
-          <span className="layers-chevron">{layersOpen ? '▲' : '▼'}</span>
-        </button>
-
-        {layersOpen && (
-          <div className="layers-body">
+      {/* ورقة جلسات التسميع — كل تاريخ جلسة طبقة مستقلة */}
+      {layersOpen && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setLayersOpen(false)} />
+          <div className="sheet controls" role="dialog" aria-label="جلسات التسميع">
+            <div className="sheet-handle" />
+            <h3 className="sheet-title">
+              🗓️ جلسات التسميع{' '}
+              {layers.length > 0 && (
+                <span className="layers-count">{toArabicDigits(layers.length)}</span>
+              )}
+            </h3>
+            <div className="layers-body">
             {layers.length === 0 && sessionLogs.length === 0 ? (
               <p className="layers-empty">
                 لا توجد جلسات بعد — ارصد أول خطأ وستظهر جلسة اليوم هنا،
@@ -1555,104 +1401,19 @@ export default function Home() {
                   ))}
               </>
             )}
+            </div>
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setLayersOpen(false)}>
+                إغلاق
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      {/* راحة القراءة: السمة + حجم الخط + وضع التركيز */}
-      <div className="reading-tools w-full max-w-xl">
-        <div className="theme-seg" role="group" aria-label="سمة القراءة">
-          <button
-            className={theme === 'light' ? 'active' : ''}
-            onClick={() => setTheme('light')}
-            title="فاتح"
-          >
-            ☀️
-          </button>
-          <button
-            className={theme === 'dark' ? 'active' : ''}
-            onClick={() => setTheme('dark')}
-            title="ليلي"
-          >
-            🌙
-          </button>
-          <button
-            className={theme === 'sepia' ? 'active' : ''}
-            onClick={() => setTheme('sepia')}
-            title="دافئ للعين"
-          >
-            📖
-          </button>
-        </div>
-        <div className="font-seg" role="group" aria-label="حجم الخط">
-          <button
-            onClick={() =>
-              setFontScale((s) => Math.max(0.9, Math.round((s - 0.1) * 10) / 10))
-            }
-            disabled={fontScale <= 0.9}
-            aria-label="تصغير الخط"
-          >
-            أ−
-          </button>
-          <span className="font-cur">{toArabicDigits(Math.round(fontScale * 100))}٪</span>
-          <button
-            onClick={() =>
-              setFontScale((s) => Math.min(1.4, Math.round((s + 0.1) * 10) / 10))
-            }
-            disabled={fontScale >= 1.4}
-            aria-label="تكبير الخط"
-          >
-            أ+
-          </button>
-        </div>
-        <button className="focus-btn" onClick={() => setFocusMode(true)}>
-          ⛶ قراءة مركّزة
-        </button>
-      </div>
-
-      {/* أدوات التنقل — فوق المصحف مباشرة */}
-      <div className="controls w-full max-w-xl flex flex-wrap items-center gap-2 justify-center">
-        <select
-          value={currentChapter}
-          onChange={(e) => {
-            const c = chapterMap.get(Number(e.target.value));
-            if (c) go(c.pages[0]);
-          }}
-          className="flex-1 min-w-36"
-          aria-label="اختيار السورة"
-        >
-          {chapters.map((c) => (
-            <option key={c.id} value={c.id}>
-              {toArabicDigits(c.id)}. {c.name}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="text"
-          inputMode="numeric"
-          placeholder={`صفحة ١-${toArabicDigits(TOTAL_PAGES)}`}
-          value={pageInput}
-          onChange={(e) => setPageInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submitPageInput()}
-          onBlur={() => pageInput && submitPageInput()}
-          className="w-28 text-center"
-          aria-label="الانتقال إلى صفحة"
-        />
-
-        <div className="flex gap-2">
-          <button className="nav-btn" onClick={() => go(page - 1)} disabled={page <= 1}>
-            ▶ السابقة
-          </button>
-          <button className="nav-btn" onClick={() => go(page + 1)} disabled={page >= TOTAL_PAGES}>
-            التالية ◀
-          </button>
-        </div>
-      </div>
-
-      {/* صفحة المصحف */}
+      {/* صفحة المصحف — تملأ الشاشة */}
       <div
-        className={`w-full max-w-xl relative${focusMode ? ' reading-focus-stage' : ''}`}
+        className="stage w-full"
         ref={pageWrapRef}
         onTouchStart={onPageTouchStart}
         onTouchEnd={onPageTouchEnd}
@@ -1671,37 +1432,38 @@ export default function Home() {
             />
           </div>
         ) : (
-          <div
-            className="mushaf-frame w-full animate-pulse"
-            style={{ aspectRatio: '0.68' }}
-          />
+          <div className="mushaf-anim">
+            <div className="mushaf-frame w-full animate-pulse" style={{ height: '100%' }} />
+          </div>
         )}
 
-        {/* عناصر التحكم العائمة في وضع القراءة المركّزة */}
+        {/* أسهم جانبية للتنقل — تختفي على شاشات اللمس (السحب يكفي) */}
+        <button
+          className="focus-nav focus-prev"
+          onClick={() => go(page - 1)}
+          disabled={page <= 1}
+          aria-label="الصفحة السابقة"
+        >
+          ▶
+        </button>
+        <button
+          className="focus-nav focus-next"
+          onClick={() => go(page + 1)}
+          disabled={page >= TOTAL_PAGES}
+          aria-label="الصفحة التالية"
+        >
+          ◀
+        </button>
+
+        {/* الخروج من القراءة الصافية + رقم الصفحة */}
         {focusMode && (
           <>
             <button
               className="focus-exit"
               onClick={() => setFocusMode(false)}
-              aria-label="خروج من وضع القراءة المركّزة"
+              aria-label="إظهار الأدوات"
             >
               ✕
-            </button>
-            <button
-              className="focus-nav focus-prev"
-              onClick={() => go(page - 1)}
-              disabled={page <= 1}
-              aria-label="الصفحة السابقة"
-            >
-              ▶
-            </button>
-            <button
-              className="focus-nav focus-next"
-              onClick={() => go(page + 1)}
-              disabled={page >= TOTAL_PAGES}
-              aria-label="الصفحة التالية"
-            >
-              ◀
             </button>
             <div className="focus-page">{toArabicDigits(page)}</div>
           </>
@@ -1823,25 +1585,398 @@ export default function Home() {
         )}
       </div>
 
-      <footer className="app-footer">
-        <p className="text-xs opacity-60 font-semibold">
-          النص القرآني وفق مصحف المدينة النبوية — مجمع الملك فهد لطباعة المصحف الشريف
-        </p>
-        {syncState !== 'off' && (
+      {/* الشريط السفلي: تاريخ الجلسة + المصحف النشط + المزيد */}
+      {!focusMode && (
+        <nav className="bottom-bar w-full">
+          <label className="bar-chip date-chip" title="تاريخ الجلسة — كل رصد اليوم يُسجّل عليها">
+            📅
+            <input
+              type="date"
+              value={sessionDate}
+              onChange={(e) => e.target.value && setSessionDate(e.target.value)}
+              aria-label="تاريخ الجلسة"
+            />
+          </label>
           <button
-            className={`support-btn ${supportUnread ? 'has-reply' : ''}`}
-            onClick={() => {
-              setSupportState('idle');
-              setSupportOpen(true);
-              setSupportUnread(false);
-              localStorage.setItem('rassd:supportSeen', new Date().toISOString());
-              loadMyFeedback();
-            }}
+            className="bar-chip profile-chip"
+            onClick={() => setProfileOpen(true)}
+            title={
+              syncState === 'ok'
+                ? 'الرصد محفوظ في السحابة'
+                : syncState === 'syncing'
+                  ? 'جاري المزامنة…'
+                  : syncState === 'error'
+                    ? 'تعذّرت المزامنة — الرصد محفوظ محلياً وسيُرفع لاحقاً'
+                    : 'الحفظ محلي على هذا الجهاز'
+            }
           >
-            🛟 الدعم والملاحظات{supportUnread && ' — رد جديد ✨'}
+            <i className={`sync-dot sync-${syncState}`} aria-hidden />
+            ✍️ {activeName ?? 'مصحفي'}
           </button>
-        )}
-      </footer>
+          {pageErrorCount > 0 && (
+            <button
+              className="bar-chip count-chip"
+              onClick={() => setLayersOpen(true)}
+              title="كلمات مرصودة في هذه الصفحة — نقرة لإدارة الجلسات"
+            >
+              🔖 {toArabicDigits(pageErrorCount)}
+            </button>
+          )}
+          <button
+            className="bar-chip more-chip"
+            onClick={() => setMoreOpen(true)}
+            aria-label="كل الأدوات"
+          >
+            ⋯{supportUnread && <i className="unread-dot" aria-hidden />}
+          </button>
+        </nav>
+      )}
+
+      {/* ورقة التنقل: السورة والصفحة */}
+      {navOpen && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setNavOpen(false)} />
+          <div className="sheet controls" role="dialog" aria-label="التنقل">
+            <div className="sheet-handle" />
+            <h3 className="sheet-title">📖 التنقل</h3>
+            <div className="sheet-row">
+              <select
+                value={currentChapter}
+                onChange={(e) => {
+                  const c = chapterMap.get(Number(e.target.value));
+                  if (c) {
+                    go(c.pages[0]);
+                    setNavOpen(false);
+                  }
+                }}
+                className="flex-1 min-w-36"
+                aria-label="اختيار السورة"
+              >
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {toArabicDigits(c.id)}. {c.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder={`صفحة ١-${toArabicDigits(TOTAL_PAGES)}`}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    submitPageInput();
+                    setNavOpen(false);
+                  }
+                }}
+                className="w-28 text-center"
+                aria-label="الانتقال إلى صفحة"
+              />
+            </div>
+            <div className="export-actions">
+              <button className="nav-btn" onClick={() => go(page - 1)} disabled={page <= 1}>
+                ▶ السابقة
+              </button>
+              <button
+                className="nav-btn"
+                onClick={() => go(page + 1)}
+                disabled={page >= TOTAL_PAGES}
+              >
+                التالية ◀
+              </button>
+              <button className="cancel-btn" onClick={() => setNavOpen(false)}>
+                إغلاق
+              </button>
+            </div>
+            <p className="export-hint dim-hint">
+              💡 اسحب صفحة المصحف يميناً أو يساراً لتقليب الصفحات مباشرة.
+            </p>
+          </div>
+        </>
+      )}
+
+      {/* ورقة اختيار المصحف: أرصد في مصحفي أو مصحف طالب */}
+      {profileOpen && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setProfileOpen(false)} />
+          <div className="sheet controls" role="dialog" aria-label="اختيار المصحف">
+            <div className="sheet-handle" />
+            <h3 className="sheet-title">✍️ أرصد في</h3>
+            <div className="profile-list">
+              <button
+                className={`profile-row ${activeStudent === null ? 'active' : ''}`}
+                onClick={() => {
+                  switchProfile(null);
+                  setProfileOpen(false);
+                }}
+              >
+                👤 مصحفي
+              </button>
+              {allStudents.map((s) => (
+                <button
+                  key={s.id}
+                  className={`profile-row ${activeStudent === s.id ? 'active' : ''}`}
+                  onClick={() => {
+                    switchProfile(s.id);
+                    setProfileOpen(false);
+                  }}
+                >
+                  🎓 {s.name} {s.cloud && <em className="cloud-tag">☁️</em>}
+                </button>
+              ))}
+              <button
+                className="profile-row manage"
+                onClick={() => {
+                  setStudentMsg('');
+                  setStudentsOpen(true);
+                  setProfileOpen(false);
+                }}
+              >
+                👥 إدارة طلابي…
+              </button>
+            </div>
+            {activeName && (
+              <p className="export-hint dim-hint">
+                الرصد يُحفظ في مصحف {activeName} ويظهر عنده مباشرة.
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ورقة «المزيد»: كل الأدوات مرتّبة بمجموعات */}
+      {moreOpen && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setMoreOpen(false)} />
+          <div className="sheet controls" role="dialog" aria-label="كل الأدوات">
+            <div className="sheet-handle" />
+
+            <div className="reading-tools">
+              <div className="theme-seg" role="group" aria-label="سمة القراءة">
+                <button
+                  className={theme === 'light' ? 'active' : ''}
+                  onClick={() => setTheme('light')}
+                >
+                  ☀️ فاتح
+                </button>
+                <button
+                  className={theme === 'dark' ? 'active' : ''}
+                  onClick={() => setTheme('dark')}
+                >
+                  🌙 ليلي
+                </button>
+                <button
+                  className={theme === 'sepia' ? 'active' : ''}
+                  onClick={() => setTheme('sepia')}
+                >
+                  📖 دافئ
+                </button>
+              </div>
+              <div className="font-seg" role="group" aria-label="حجم الخط">
+                <button
+                  onClick={() =>
+                    setFontScale((s) => Math.max(0.9, Math.round((s - 0.1) * 10) / 10))
+                  }
+                  disabled={fontScale <= 0.9}
+                  aria-label="تصغير الخط"
+                >
+                  أ−
+                </button>
+                <span className="font-cur">
+                  {toArabicDigits(Math.round(fontScale * 100))}٪
+                </span>
+                <button
+                  onClick={() =>
+                    setFontScale((s) => Math.min(1.4, Math.round((s + 0.1) * 10) / 10))
+                  }
+                  disabled={fontScale >= 1.4}
+                  aria-label="تكبير الخط"
+                >
+                  أ+
+                </button>
+              </div>
+            </div>
+
+            <p className="sheet-section">الجلسة</p>
+            <div className="sheet-grid">
+              <button
+                className="sheet-tile"
+                onClick={() => {
+                  const first = data?.verses[0];
+                  if (first) {
+                    const [s, a1] = first.key.split(':').map(Number);
+                    setLogSurah(s);
+                    setLogFrom(String(a1));
+                    const same = data!.verses.filter((v) => v.chapter === s);
+                    setLogTo(same[same.length - 1].key.split(':')[1]);
+                  }
+                  setLogMsg('');
+                  setLogOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                📋 تقييم الجلسة
+              </button>
+              <button
+                className="sheet-tile"
+                onClick={() => {
+                  setLayersOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                🗓️ جلسات التسميع
+                {layers.length > 0 && ` (${toArabicDigits(layers.length)})`}
+              </button>
+            </div>
+
+            <p className="sheet-section">أدوات</p>
+            <div className="sheet-grid">
+              <button
+                className="sheet-tile"
+                onClick={() => {
+                  const first = data?.verses[0];
+                  const last = data?.verses[data.verses.length - 1];
+                  if (first) {
+                    const [s, a1] = first.key.split(':').map(Number);
+                    setHifzSurah(s);
+                    setHifzFrom(String(a1));
+                    const sameSurah = data!.verses.filter((v) => v.chapter === s);
+                    const a2 = Number(sameSurah[sameSurah.length - 1].key.split(':')[1]);
+                    setHifzTo(String(a2));
+                  } else if (last) {
+                    setHifzSurah(last.chapter);
+                  }
+                  setHifzMsg('');
+                  setHifzOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                🎧 الاستماع والحفظ
+              </button>
+              <button
+                className="sheet-tile"
+                onClick={() => {
+                  setStatsOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                📊 الإحصاءات
+              </button>
+              <button
+                className="sheet-tile"
+                onClick={() => {
+                  setExportFrom(String(page));
+                  setExportTo(String(page));
+                  setExportErr('');
+                  setExportOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                📄 تصدير PDF
+              </button>
+              {allStudents.length > 0 && (
+                <button
+                  className="sheet-tile"
+                  onClick={() => {
+                    openCircle();
+                    setMoreOpen(false);
+                  }}
+                >
+                  👩‍🏫 الحلقة
+                </button>
+              )}
+            </div>
+
+            <p className="sheet-section">الحساب</p>
+            {user ? (
+              <div className="account-chip sheet-account">
+                {user.user_metadata?.avatar_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.user_metadata.avatar_url} alt="" className="account-avatar" />
+                )}
+                <span>{(user.user_metadata?.name as string)?.split(' ')[0] ?? 'حسابي'}</span>
+                <button
+                  onClick={() => signOutAccount()}
+                  title="تسجيل الخروج — يرجع البرنامج لوضع الضيف على هذا الجهاز"
+                >
+                  خروج
+                </button>
+              </div>
+            ) : syncState !== 'off' ? (
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  className="google-btn"
+                  onClick={async () => {
+                    setAuthErr('');
+                    const err = await signInWithGoogle();
+                    if (err) setAuthErr(err);
+                  }}
+                >
+                  <span className="google-g">G</span> الدخول بـ Google
+                </button>
+                <button
+                  className="google-btn"
+                  onClick={() => {
+                    setEmailVal('');
+                    setOtpVal('');
+                    setOtpSent(false);
+                    setOtpMsg('');
+                    setEmailOpen(true);
+                  }}
+                >
+                  ✉️ برمز إيميل
+                </button>
+              </div>
+            ) : null}
+            {authErr && <p className="export-error">⚠️ {authErr}</p>}
+            <div className="sheet-grid">
+              {syncState !== 'off' && (
+                <button
+                  className="sheet-tile"
+                  onClick={() => {
+                    setLinkInput('');
+                    setLinkMsg('');
+                    setCopied(false);
+                    setLinkOpen(true);
+                    setMoreOpen(false);
+                  }}
+                >
+                  {user ? '🔗 رمزي' : '🔗 أجهزتي'}
+                </button>
+              )}
+              {syncState !== 'off' && (
+                <button
+                  className="sheet-tile"
+                  onClick={() => {
+                    setSupportState('idle');
+                    setSupportOpen(true);
+                    setSupportUnread(false);
+                    localStorage.setItem('rassd:supportSeen', new Date().toISOString());
+                    loadMyFeedback();
+                    setMoreOpen(false);
+                  }}
+                >
+                  🛟 الدعم والملاحظات{supportUnread && ' — رد جديد ✨'}
+                </button>
+              )}
+            </div>
+            {onlineCount > 0 && (
+              <span className="online-badge" title="عدد المتواجدين في التطبيق الآن">
+                <i className="online-dot" /> المتواجدون الآن: {toArabicDigits(onlineCount)}
+              </span>
+            )}
+            <p className="attribution">
+              النص القرآني وفق مصحف المدينة النبوية — مجمع الملك فهد لطباعة المصحف الشريف
+            </p>
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setMoreOpen(false)}>
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* نافذة الدعم والملاحظات */}
       {supportOpen && (
