@@ -193,6 +193,12 @@ export default function Home() {
   const hifzStopRef = useRef(true);
   const pageRef = useRef(1);
   const [reciter, setReciter] = useState(DEFAULT_RECITER);
+  // راحة القراءة: السمة، حجم الخط، وضع التركيز، وحركة انزلاق الصفحة
+  const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>('light');
+  const [fontScale, setFontScale] = useState(1);
+  const [focusMode, setFocusMode] = useState(false);
+  const [flip, setFlip] = useState<{ dir: 'next' | 'prev'; n: number }>({ dir: 'next', n: 0 });
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const [liveIdentity, setLiveIdentity] = useState('');
   const liveChannelRef = useRef<ReturnType<
     NonNullable<ReturnType<typeof getSupabase>>['channel']
@@ -386,6 +392,12 @@ export default function Home() {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
     setReciter(loadReciter());
+    const savedTheme = localStorage.getItem('rassd:theme');
+    if (savedTheme === 'dark' || savedTheme === 'sepia' || savedTheme === 'light') {
+      setTheme(savedTheme);
+    }
+    const savedScale = Number(localStorage.getItem('rassd:fontScale'));
+    if (savedScale >= 0.9 && savedScale <= 1.4) setFontScale(savedScale);
     fetch('/quran/chapters.json')
       .then((r) => r.json())
       .then(setChapters);
@@ -567,8 +579,58 @@ export default function Home() {
   }, [page]);
 
   const go = useCallback((p: number) => {
-    if (p >= 1 && p <= TOTAL_PAGES) setPage(p);
+    if (p >= 1 && p <= TOTAL_PAGES) {
+      setFlip((f) => ({ dir: p > pageRef.current ? 'next' : 'prev', n: f.n + 1 }));
+      setPage(p);
+    }
   }, []);
+
+  // تطبيق سمة القراءة وحفظها (فاتح / ليلي / دافئ)
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('rassd:theme', theme);
+  }, [theme]);
+
+  // حجم خط المصحف — متغيّر CSS يُضرب في مقاسات الأسطر
+  useEffect(() => {
+    document.documentElement.style.setProperty('--reading-scale', String(fontScale));
+    localStorage.setItem('rassd:fontScale', String(fontScale));
+  }, [fontScale]);
+
+  // وضع القراءة المركّزة: منع تمرير الخلفية خلف الطبقة الملء-شاشية
+  useEffect(() => {
+    document.body.classList.toggle('focus-lock', focusMode);
+    return () => document.body.classList.remove('focus-lock');
+  }, [focusMode]);
+
+  // إبقاء الشاشة مضاءة أثناء القراءة المركّزة أو التلاوة (Wake Lock)
+  useEffect(() => {
+    const active = focusMode || hifzStatus !== null || playingAyah !== null;
+    if (!active) return;
+    let cancelled = false;
+    const request = async () => {
+      try {
+        const wl = (navigator as Navigator & { wakeLock?: WakeLock }).wakeLock;
+        if (wl && !wakeLockRef.current && !cancelled) {
+          wakeLockRef.current = await wl.request('screen');
+        }
+      } catch {
+        /* غير مدعوم أو مرفوض — نتجاهل بهدوء */
+      }
+    };
+    request();
+    // النظام يحرّر القفل عند إخفاء التبويب؛ نعيد طلبه عند العودة
+    const onVis = () => {
+      if (document.visibilityState === 'visible') request();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      wakeLockRef.current?.release().catch(() => {});
+      wakeLockRef.current = null;
+    };
+  }, [focusMode, hifzStatus, playingAyah]);
 
   // السحب باللمس لتبديل الصفحات — نفس اتجاه أسهم الكيبورد:
   // سحب لليسار = الصفحة التالية، سحب لليمين = السابقة (اتجاه تصفّح المصحف)
@@ -1497,6 +1559,57 @@ export default function Home() {
         )}
       </div>
 
+      {/* راحة القراءة: السمة + حجم الخط + وضع التركيز */}
+      <div className="reading-tools w-full max-w-xl">
+        <div className="theme-seg" role="group" aria-label="سمة القراءة">
+          <button
+            className={theme === 'light' ? 'active' : ''}
+            onClick={() => setTheme('light')}
+            title="فاتح"
+          >
+            ☀️
+          </button>
+          <button
+            className={theme === 'dark' ? 'active' : ''}
+            onClick={() => setTheme('dark')}
+            title="ليلي"
+          >
+            🌙
+          </button>
+          <button
+            className={theme === 'sepia' ? 'active' : ''}
+            onClick={() => setTheme('sepia')}
+            title="دافئ للعين"
+          >
+            📖
+          </button>
+        </div>
+        <div className="font-seg" role="group" aria-label="حجم الخط">
+          <button
+            onClick={() =>
+              setFontScale((s) => Math.max(0.9, Math.round((s - 0.1) * 10) / 10))
+            }
+            disabled={fontScale <= 0.9}
+            aria-label="تصغير الخط"
+          >
+            أ−
+          </button>
+          <span className="font-cur">{toArabicDigits(Math.round(fontScale * 100))}٪</span>
+          <button
+            onClick={() =>
+              setFontScale((s) => Math.min(1.4, Math.round((s + 0.1) * 10) / 10))
+            }
+            disabled={fontScale >= 1.4}
+            aria-label="تكبير الخط"
+          >
+            أ+
+          </button>
+        </div>
+        <button className="focus-btn" onClick={() => setFocusMode(true)}>
+          ⛶ قراءة مركّزة
+        </button>
+      </div>
+
       {/* أدوات التنقل — فوق المصحف مباشرة */}
       <div className="controls w-full max-w-xl flex flex-wrap items-center gap-2 justify-center">
         <select
@@ -1539,24 +1652,59 @@ export default function Home() {
 
       {/* صفحة المصحف */}
       <div
-        className="w-full max-w-xl relative"
+        className={`w-full max-w-xl relative${focusMode ? ' reading-focus-stage' : ''}`}
         ref={pageWrapRef}
         onTouchStart={onPageTouchStart}
         onTouchEnd={onPageTouchEnd}
       >
         {data && chapters.length > 0 ? (
-          <MushafPage
-            data={data}
-            chapters={chapterMap}
-            marks={pageMarks}
-            onWordClick={onWordClick}
-            activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : null}
-          />
+          <div
+            key={data.page}
+            className={`mushaf-anim ${flip.dir === 'next' ? 'anim-next' : 'anim-prev'}`}
+          >
+            <MushafPage
+              data={data}
+              chapters={chapterMap}
+              marks={pageMarks}
+              onWordClick={onWordClick}
+              activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : null}
+            />
+          </div>
         ) : (
           <div
             className="mushaf-frame w-full animate-pulse"
             style={{ aspectRatio: '0.68' }}
           />
+        )}
+
+        {/* عناصر التحكم العائمة في وضع القراءة المركّزة */}
+        {focusMode && (
+          <>
+            <button
+              className="focus-exit"
+              onClick={() => setFocusMode(false)}
+              aria-label="خروج من وضع القراءة المركّزة"
+            >
+              ✕
+            </button>
+            <button
+              className="focus-nav focus-prev"
+              onClick={() => go(page - 1)}
+              disabled={page <= 1}
+              aria-label="الصفحة السابقة"
+            >
+              ▶
+            </button>
+            <button
+              className="focus-nav focus-next"
+              onClick={() => go(page + 1)}
+              disabled={page >= TOTAL_PAGES}
+              aria-label="الصفحة التالية"
+            >
+              ◀
+            </button>
+            <div className="focus-page">{toArabicDigits(page)}</div>
+          </>
         )}
 
         {/* نافذة اختيار نوع الخطأ */}

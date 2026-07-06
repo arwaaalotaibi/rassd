@@ -84,7 +84,7 @@ body {
   align-items: center;
   justify-content: space-between;
   font-family: "UthmanicHafs", serif;
-  font-size: 4.55cqw;
+  font-size: calc(4.55cqw * var(--reading-scale, 1));
   line-height: 1.05;
   color: var(--ink);
 }
@@ -169,7 +169,7 @@ body {
 
 .basmala-line {
   justify-content: center !important;
-  font-size: 4.2cqw;
+  font-size: calc(4.2cqw * var(--reading-scale, 1));
   color: var(--ink);
 }
 
@@ -1940,4 +1940,197 @@ body {
 
 .print-legend .legend-chip {
   font-size: 13px;
+}
+
+/* ═══════════ سمات القراءة: ليلي / دافئ ═══════════ */
+html[data-theme='dark'] {
+  --bg: #0c1210;
+  --paper: #18221d;
+  --paper-deep: #121a16;
+  --ink: #ece5d2;
+  --gold: #cba95a;
+  --gold-soft: #4f4429;
+  --green: #57b593;
+  --green-deep: #83cfb2;
+}
+html[data-theme='dark'] body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #16241d 0%, transparent 60%),
+    var(--bg);
+}
+/* المات الداخلي للإطار يبقى داكناً (‏--green-deep صار فاتحاً في الليلي) */
+html[data-theme='dark'] .mushaf-frame-inner {
+  background: #0b1310;
+}
+
+html[data-theme='sepia'] {
+  --bg: #e3d4b4;
+  --paper: #f6ecd4;
+  --paper-deep: #efe0c0;
+  --ink: #4a3c28;
+  --gold: #a9863b;
+  --gold-soft: #cdb98a;
+  --green: #3f7a63;
+  --green-deep: #2f5f4b;
+}
+html[data-theme='sepia'] body {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, #f4e8cb 0%, transparent 60%),
+    var(--bg);
+}
+
+/* انتقال ناعم عند تبديل السمة */
+body,
+.mushaf-page,
+.mushaf-frame-inner,
+.session-bar,
+.tools-bar .tool-btn,
+.controls select,
+.controls input {
+  transition:
+    background-color 240ms ease,
+    color 240ms ease,
+    border-color 240ms ease;
+}
+
+/* ═══════════ شريط أدوات القراءة ═══════════ */
+.reading-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.theme-seg,
+.font-seg {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.theme-seg button,
+.font-seg button {
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--green-deep);
+  transition: background-color 120ms ease;
+}
+.theme-seg button.active {
+  background: var(--green);
+  color: #fdfaf1;
+}
+.font-seg button:not(:disabled):hover {
+  background: rgba(184, 145, 47, 0.16);
+}
+.font-seg .font-cur {
+  min-width: 46px;
+  text-align: center;
+  color: var(--ink);
+  cursor: default;
+}
+.font-seg button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.focus-btn {
+  padding: 6px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--green-deep);
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  transition: background-color 120ms ease;
+}
+.focus-btn:hover {
+  background: rgba(184, 145, 47, 0.16);
+}
+
+/* ═══════════ حركة انزلاق الصفحة ═══════════ */
+@keyframes flip-next {
+  from { opacity: 0; transform: translateX(-22px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes flip-prev {
+  from { opacity: 0; transform: translateX(22px); }
+  to { opacity: 1; transform: none; }
+}
+.mushaf-anim.anim-next { animation: flip-next 240ms ease; }
+.mushaf-anim.anim-prev { animation: flip-prev 240ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .mushaf-anim.anim-next,
+  .mushaf-anim.anim-prev { animation: none; }
+}
+
+/* ═══════════ وضع القراءة المركّزة ═══════════ */
+body.focus-lock { overflow: hidden; }
+.reading-focus-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: 0 !important;
+  max-width: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px
+    max(12px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(1200px 600px at 50% -10%,
+      color-mix(in srgb, var(--bg) 70%, #000) 0%, transparent 60%),
+    var(--bg);
+}
+.reading-focus-stage .mushaf-frame {
+  margin: auto;
+  max-width: min(100%, calc((100dvh - 24px) * 0.68));
+}
+.focus-exit {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  inset-inline-end: 12px;
+  z-index: 62;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--green-deep);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border: 1.5px solid var(--gold-soft);
+  backdrop-filter: blur(6px);
+}
+.focus-nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 62;
+  width: 44px;
+  height: 66px;
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--green-deep);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  border: 1.5px solid var(--gold-soft);
+  backdrop-filter: blur(6px);
+}
+.focus-nav:disabled { opacity: 0.3; pointer-events: none; }
+.focus-prev { inset-inline-end: 8px; }
+.focus-next { inset-inline-start: 8px; }
+.focus-page {
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 62;
+  padding: 4px 18px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: var(--green-deep);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border: 1.5px solid var(--gold-soft);
+  backdrop-filter: blur(6px);
 }
