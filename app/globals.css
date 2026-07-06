@@ -2083,15 +2083,25 @@ body.focus-lock { overflow: hidden; }
       color-mix(in srgb, var(--bg) 70%, #000) 0%, transparent 60%),
     var(--bg);
 }
-/* عرض المصحف داخل وضع التركيز: أكبر ما يسمح به الارتفاع مع نسبة الصفحة ٠٫٦٨
-   (يُضبط على الغلاف المتحرك لأن الإطار داخله عرضه ١٠٠٪ من أبيه) */
+/* المصحف داخل وضع التركيز يملأ الشاشة كاملة (آيفون/آيباد):
+   الصفحة تتحرر من نسبة ٠٫٦٨ وتتمدد طولاً وعرضاً، والأسطر تتوزع على الارتفاع.
+   على الشاشات العريضة جداً نحدّ العرض بنسبة من الارتفاع حتى لا تتشوه الأسطر */
 .reading-focus-stage .mushaf-anim,
 .reading-focus-stage > .mushaf-frame {
-  width: min(100%, calc((100dvh - 90px) * 0.68));
-  margin: auto;
+  width: min(100%, calc((100dvh - 16px) * 0.8));
+  height: 100%;
+  margin-inline: auto;
 }
 .reading-focus-stage .mushaf-anim .mushaf-frame {
   max-width: none;
+  height: 100%;
+}
+.reading-focus-stage .mushaf-frame-inner {
+  height: 100%;
+}
+.reading-focus-stage .mushaf-page {
+  aspect-ratio: auto !important;
+  height: 100%;
 }
 .focus-exit {
   position: fixed;
