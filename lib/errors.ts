@@ -1,6 +1,6 @@
 // نموذج بيانات علامات الأخطاء وتخزينها محلياً (المرحلة ٥ تنقلها إلى Supabase)
 
-export type ErrorType = 'khata' | 'taraddud' | 'tashkeel' | 'tajweed';
+export type ErrorType = 'khata' | 'taraddud' | 'tashkeel' | 'tajweed' | 'similar';
 
 export const ERROR_TYPES: Record<
   ErrorType,
@@ -10,6 +10,7 @@ export const ERROR_TYPES: Record<
   taraddud: { label: 'تردّد', color: '#d68910', bg: 'rgba(214, 137, 16, 0.20)' },
   tashkeel: { label: 'تشكيل', color: '#2471a3', bg: 'rgba(36, 113, 163, 0.16)' },
   tajweed: { label: 'تجويد', color: '#7d3c98', bg: 'rgba(125, 60, 152, 0.15)' },
+  similar: { label: 'تشابه', color: '#0e7490', bg: 'rgba(14, 116, 144, 0.14)' },
 };
 
 export type ErrorMark = {

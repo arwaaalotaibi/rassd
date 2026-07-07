@@ -18,6 +18,7 @@ export function computeStats(marks: ErrorMark[]): Stats {
     taraddud: 0,
     tashkeel: 0,
     tajweed: 0,
+    similar: 0,
   };
   const pages = new Map<number, number>();
   const wordDates = new Map<string, Set<string>>();

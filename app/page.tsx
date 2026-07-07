@@ -43,6 +43,7 @@ import {
   type PageData,
   type SearchEntry,
 } from '@/lib/quran';
+import { buildAdjacency, diffFlags, splitWords } from '@/lib/mutashabihat';
 import {
   addTeacherLink,
   adoptSyncCode,
@@ -112,6 +113,12 @@ export default function Home() {
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // تعليمات الاستخدام — تظهر تلقائياً في أول زيارة
   const [tourOpen, setTourOpen] = useState(false);
+  // المتشابهات: التفعيل + خريطة «آية ← شبيهاتها» + الآية المفتوحة للمقارنة
+  const [similarOn, setSimilarOn] = useState(false);
+  const [similarAdj, setSimilarAdj] = useState<Map<string, string[]> | null>(null);
+  const [similarFor, setSimilarFor] = useState<string | null>(null);
+  const [similarMsg, setSimilarMsg] = useState('');
+  const verseInfoRef = useRef<Map<string, SearchEntry>>(new Map());
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
@@ -437,6 +444,13 @@ export default function Home() {
     // تعليمات الاستخدام تظهر مرة واحدة لمن يفتح التطبيق أول مرة
     if (localStorage.getItem('rassd:tourSeen') !== '1') setTourOpen(true);
 
+    // استرجاع تفعيل المتشابهات من الجلسات السابقة
+    if (localStorage.getItem('rassd:similar') === '1') {
+      setSimilarOn(true);
+      loadSimilarData();
+      ensureSearchIndex();
+    }
+
     // تسجيل عامل الخدمة للعمل بدون إنترنت (PWA)
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -546,6 +560,11 @@ export default function Home() {
     liveChannelRef.current?.send({ type: 'broadcast', event: 'marks-changed', payload: {} });
   }, []);
 
+  const updateMarks = useCallback((next: ErrorMark[]) => {
+    setMarks(next);
+    if (identityRef.current) saveMarks(identityRef.current, next);
+  }, []);
+
   // عدّاد المتواجدين الآن: حضور لحظي عبر Supabase Realtime Presence
   // (المفتاح = هوية الجهاز، فالشخص الواحد بعدة تبويبات يُحسب مرة واحدة)
   useEffect(() => {
@@ -606,20 +625,45 @@ export default function Home() {
     }
   }, []);
 
-  // بحث الآيات: تحميل الفهرس مرة واحدة عند أول فتح، مع تطبيع نص كل آية للمطابقة
-  const openSearch = useCallback(() => {
-    setSearchOpen(true);
+  // فهرس نصوص الآيات (مشترك بين البحث والمتشابهات) — يُحمَّل مرة واحدة
+  const ensureSearchIndex = useCallback(() => {
     if (searchLoaded || searchLoading) return;
     setSearchLoading(true);
     fetch('/quran/search-index.json')
       .then((r) => r.json())
       .then((idx: SearchEntry[]) => {
         searchIndexRef.current = idx.map((e) => ({ ...e, n: normalizeArabic(e.t) }));
+        verseInfoRef.current = new Map(idx.map((e) => [e.k, e]));
         setSearchLoaded(true);
       })
       .catch(() => {})
       .finally(() => setSearchLoading(false));
   }, [searchLoaded, searchLoading]);
+
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    ensureSearchIndex();
+  }, [ensureSearchIndex]);
+
+  // المتشابهات: تحميل الأزواج وبناء خريطة التجاور (مرة واحدة عند التفعيل)
+  const loadSimilarData = useCallback(() => {
+    fetch('/quran/mutashabihat.json')
+      .then((r) => r.json())
+      .then((pairs: [string, string][]) => setSimilarAdj(buildAdjacency(pairs)))
+      .catch(() => {});
+  }, []);
+
+  const toggleSimilar = useCallback(() => {
+    setSimilarOn((on) => {
+      const next = !on;
+      localStorage.setItem('rassd:similar', next ? '1' : '0');
+      if (next) {
+        if (!similarAdj) loadSimilarData();
+        ensureSearchIndex();
+      }
+      return next;
+    });
+  }, [similarAdj, loadSimilarData, ensureSearchIndex]);
 
   // نتائج البحث: كل كلمة مكتوبة يجب أن ترد في الآية (مطابقة مرنة لا تتقيّد بالترتيب)
   const searchResults = useMemo(() => {
@@ -648,6 +692,69 @@ export default function Home() {
     },
     [go]
   );
+
+  // سماع آيتين متشابهتين تباعاً — الأولى ثم شبيهتها مباشرة (للتثبيت بالسمع)
+  const playTwoAyahs = useCallback(
+    (first: string, second: string) => {
+      // إن كانت إحداهما تُشغَّل الآن فالنقرة توقف
+      if (playingAyah === first || playingAyah === second) {
+        audioRef.current?.pause();
+        audioRef.current = null;
+        setPlayingAyah(null);
+        return;
+      }
+      const [s1, a1] = first.split(':').map(Number);
+      const [s2, a2] = second.split(':').map(Number);
+      audioRef.current?.pause();
+      const audio1 = new Audio(ayahAudioUrl(reciter, s1, a1));
+      audioRef.current = audio1;
+      setPlayingAyah(first);
+      const stop = () => setPlayingAyah(null);
+      audio1.onended = () => {
+        const audio2 = new Audio(ayahAudioUrl(reciter, s2, a2));
+        audioRef.current = audio2;
+        setPlayingAyah(second);
+        audio2.onended = stop;
+        audio2.onerror = stop;
+        audio2.play().catch(stop);
+      };
+      audio1.onerror = stop;
+      audio1.play().catch(stop);
+    },
+    [playingAyah, reciter]
+  );
+
+  // رصد خلط متشابه: علامة «تشابه» على أول كلمة في الآية مع ملاحظة الشبيهة المخلوطة معها
+  const markSimilarConfusion = useCallback(
+    (verseKey: string, twinKey: string) => {
+      const entry = verseInfoRef.current.get(verseKey);
+      if (!entry) return;
+      const [ts, ta] = twinKey.split(':');
+      const twinName = `${chapterMap.get(Number(ts))?.name ?? ts} ${toArabicDigits(ta)}`;
+      const note = `خلط مع ${twinName}`;
+      const wordId = `${verseKey}:1`;
+      const next = upsertMark(marks, wordId, entry.p, 'similar', sessionDate, note);
+      updateMarks(next);
+      const added = next.find((m) => m.id === `${wordId}@${sessionDate}`);
+      if (added && getSupabase()) {
+        setSyncState('syncing');
+        pushMarks(identityRef.current, [added]).then((ok) => {
+          setSyncState(ok ? 'ok' : 'error');
+          if (ok) broadcastChange();
+        });
+      }
+      setSimilarMsg(`✅ رُصد الخلط مع ${twinName} في جلسة اليوم`);
+    },
+    [chapterMap, marks, sessionDate, updateMarks, broadcastChange]
+  );
+
+  // آيات الصفحة الحالية التي لها متشابهات (لإظهار الشارة)
+  const pageSimilarKeys = useMemo(() => {
+    if (!similarOn || !data || !similarAdj) return null;
+    const s = new Set<string>();
+    for (const v of data.verses) if (similarAdj.has(v.key)) s.add(v.key);
+    return s.size > 0 ? s : null;
+  }, [similarOn, data, similarAdj]);
 
   // تطبيق سمة القراءة وحفظها (فاتح / ليلي / دافئ)
   useEffect(() => {
@@ -731,16 +838,12 @@ export default function Home() {
         setProfileOpen(false);
         setLayersOpen(false);
         setSearchOpen(false);
+        setSimilarFor(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [page, go]);
-
-  const updateMarks = useCallback((next: ErrorMark[]) => {
-    setMarks(next);
-    if (identityRef.current) saveMarks(identityRef.current, next);
-  }, []);
 
   // إدارة الطلاب — الرمز اختياري: إن تُرك فارغاً نولّد رمزاً جديداً (طالب بلا حساب ولا تطبيق)
   const addStudent = () => {
@@ -1344,6 +1447,19 @@ export default function Home() {
           </button>
           <div className="top-actions">
             <button
+              className={`bar-icon ${similarOn ? 'active' : ''}`}
+              onClick={toggleSimilar}
+              title={
+                similarOn
+                  ? 'إخفاء شارات المتشابهات'
+                  : 'إظهار المتشابهات — شارة عند كل آية لها شبيهات'
+              }
+              aria-label="المتشابهات"
+              aria-pressed={similarOn}
+            >
+              ⚭
+            </button>
+            <button
               className="bar-icon"
               onClick={openSearch}
               title="بحث في الآيات"
@@ -1515,6 +1631,11 @@ export default function Home() {
               marks={pageMarks}
               onWordClick={onWordClick}
               activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : flashVerse}
+              similarVerses={pageSimilarKeys}
+              onSimilarClick={(k) => {
+                setSimilarMsg('');
+                setSimilarFor(k);
+              }}
             />
           </div>
         ) : (
@@ -1792,6 +1913,103 @@ export default function Home() {
           </div>
         </>
       )}
+
+      {/* ورقة المتشابهات: الآية وشبيهاتها والفروق ملوّنة */}
+      {similarFor &&
+        (() => {
+          const current = verseInfoRef.current.get(similarFor);
+          const twins = similarAdj?.get(similarFor) ?? [];
+          const [cs, ca] = similarFor.split(':');
+          return (
+            <>
+              <div className="sheet-backdrop" onClick={() => setSimilarFor(null)} />
+              <div className="sheet controls" role="dialog" aria-label="متشابهات الآية">
+                <div className="sheet-handle" />
+                <h3 className="sheet-title">
+                  ⚭ متشابهات آية {toArabicDigits(ca)} من {chapterMap.get(Number(cs))?.name ?? cs}
+                </h3>
+                {!current ? (
+                  <p className="export-hint">⏳ يحمّل النصوص…</p>
+                ) : (
+                  <>
+                    <div className="similar-current">
+                      <p className="similar-verse">{current.t}</p>
+                      <p className="similar-ref">
+                        <span>
+                          {chapterMap.get(Number(cs))?.name ?? cs} · {toArabicDigits(ca)} —
+                          الآية الحالية
+                        </span>
+                        <span>ص{toArabicDigits(current.p)}</span>
+                      </p>
+                    </div>
+                    {twins.map((tk) => {
+                      const twin = verseInfoRef.current.get(tk);
+                      if (!twin) return null;
+                      const [ts, ta] = tk.split(':');
+                      const words = splitWords(twin.t);
+                      const [, twinFlags] = diffFlags(current.t, twin.t);
+                      return (
+                        <div key={tk} className="similar-twin">
+                          <p className="similar-verse">
+                            {words.map((w, i) => (
+                              <span key={i} className={twinFlags[i] ? '' : 'diff-w'}>
+                                {w}{' '}
+                              </span>
+                            ))}
+                          </p>
+                          <p className="similar-ref">
+                            <span>
+                              {chapterMap.get(Number(ts))?.name ?? ts} · {toArabicDigits(ta)}
+                            </span>
+                            <span>ص{toArabicDigits(twin.p)}</span>
+                          </p>
+                          <div className="similar-actions">
+                            <button
+                              className="jump-btn"
+                              onClick={() => {
+                                go(twin.p);
+                                setSimilarFor(null);
+                                setFlashVerse(tk);
+                                if (flashTimer.current) clearTimeout(flashTimer.current);
+                                flashTimer.current = setTimeout(() => setFlashVerse(null), 4500);
+                              }}
+                            >
+                              فتح صفحتها ↗
+                            </button>
+                            <button
+                              className="jump-btn"
+                              onClick={() => playTwoAyahs(similarFor, tk)}
+                            >
+                              {playingAyah === similarFor || playingAyah === tk
+                                ? '⏹ إيقاف'
+                                : '🔊 سماع الاثنتين'}
+                            </button>
+                            <button
+                              className="jump-btn"
+                              onClick={() => markSimilarConfusion(similarFor, tk)}
+                            >
+                              ✍️ رصد خلط
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {similarMsg && <p className="import-ok">{similarMsg}</p>}
+                    <p className="export-hint dim-hint">
+                      الكلمات الملوّنة هي مواضع الفرق عن الآية الحالية. «رصد خلط» يسجل
+                      علامة «تشابه» على الآية في جلسة اليوم وتظهر في الإحصاءات.
+                    </p>
+                  </>
+                )}
+                <div className="export-actions">
+                  <button className="cancel-btn" onClick={() => setSimilarFor(null)}>
+                    إغلاق
+                  </button>
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
       {/* ورقة بحث الآيات */}
       {searchOpen && (
@@ -2227,6 +2445,15 @@ export default function Home() {
                   <b>الإحصاءات:</b> تطوّر الجلسات جلسة بجلسة، توزيع أنواع الأخطاء،
                   أكثر الصفحات أخطاءً، وقائمة تفصيلية بكل كلمة مرصودة — مع حفظ
                   القائمة PDF و<b>بطاقة تقرير أسبوعية</b> تشاركها في واتساب.
+                </span>
+              </div>
+              <div className="tour-item">
+                <span className="tour-emoji">⚭</span>
+                <span>
+                  <b>المتشابهات:</b> فعّلها من الشريط العلوي فتظهر شارة ذهبية عند كل
+                  آية لها شبيهات في القرآن — انقرها لترى الآيات المتشابهة تحت بعض
+                  و<b>الفروق ملوّنة</b>، مع سماع الاثنتين تباعاً و«رصد خلط» يسجّل
+                  للطالب أي المتشابهات يخلط بينها (تظهر في الإحصاءات).
                 </span>
               </div>
               <div className="tour-item">
@@ -2728,6 +2955,42 @@ export default function Home() {
                     );
                   })}
                 </div>
+
+                {/* المتشابهات المرصود خلطها — أثمن ما تعرفه المعلّمة قبل الجلسة */}
+                {stats.types.similar > 0 && (
+                  <>
+                    <h3 className="stats-title">⚭ المتشابهات التي يخلطها</h3>
+                    <div className="students-list">
+                      {[
+                        ...new Map(
+                          marks
+                            .filter((m) => m.type === 'similar')
+                            .map((m) => [m.wordId + (m.note ?? ''), m])
+                        ).values(),
+                      ].map((m) => {
+                        const [surah, ayah] = m.wordId.split(':');
+                        return (
+                          <div key={`${m.id}@${m.date}`} className="student-row">
+                            <span className="student-name">
+                              {chapterMap.get(Number(surah))?.name ?? surah} · آية{' '}
+                              {toArabicDigits(ayah)}
+                            </span>
+                            {m.note && <span className="error-note">💬 {m.note}</span>}
+                            <button
+                              className="jump-btn"
+                              onClick={() => {
+                                go(m.page);
+                                setStatsOpen(false);
+                              }}
+                            >
+                              ص {toArabicDigits(m.page)} ↗
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 {/* أكثر الصفحات أخطاء */}
                 <h3 className="stats-title">أكثر الصفحات أخطاءً</h3>

@@ -2472,3 +2472,71 @@ body.focus-lock { overflow: hidden; }
   border: 1.5px solid var(--gold-soft);
   border-radius: 999px;
 }
+
+/* ═══════════ المتشابهات ═══════════ */
+.bar-icon.active {
+  background: rgba(20, 97, 74, 0.14);
+  border-color: var(--green);
+  color: var(--green-deep);
+}
+/* شارة صغيرة عند نهاية الآية التي لها شبيهات — تتدرج مع مقاس الصفحة */
+.similar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62em;
+  line-height: 1;
+  width: 1.5em;
+  height: 1.5em;
+  margin-inline-start: 0.12em;
+  vertical-align: super;
+  color: var(--gold);
+  background: rgba(184, 145, 47, 0.14);
+  border: 1px solid var(--gold-soft);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.similar-badge:hover {
+  background: rgba(184, 145, 47, 0.32);
+}
+
+/* ورقة المقارنة */
+.similar-current,
+.similar-twin {
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 10px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.similar-current {
+  background: rgba(20, 97, 74, 0.06);
+  border-color: var(--green);
+}
+.similar-verse {
+  font-family: "UthmanicHafs", serif;
+  font-size: 19px;
+  line-height: 2;
+  color: var(--ink);
+}
+.diff-w {
+  background: rgba(184, 145, 47, 0.3);
+  box-shadow: inset 0 -0.13em 0 0 var(--gold);
+  border-radius: 5px;
+  padding: 0 0.08em;
+}
+.similar-ref {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--green-deep);
+  opacity: 0.85;
+}
+.similar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

@@ -17,6 +17,8 @@ type Props = {
   marks?: Map<string, ErrorMark[]>;
   onWordClick?: (wordId: string, el: HTMLElement) => void;
   activeVerse?: string | null; // "سورة:آية" — الآية التي تُتلى الآن (مكرِّر الحفظ)
+  similarVerses?: Set<string> | null; // آيات لها متشابهات — شارة ⚭ عند نهايتها
+  onSimilarClick?: (verseKey: string) => void;
 };
 
 export default function MushafPage({
@@ -25,6 +27,8 @@ export default function MushafPage({
   marks,
   onWordClick,
   activeVerse,
+  similarVerses,
+  onSimilarClick,
 }: Props) {
   const lines = useMemo(() => buildLines(data), [data]);
   const ornate = data.page <= 2; // الفاتحة وبداية البقرة بتنسيق مزخرف مُوسَّط
@@ -67,11 +71,27 @@ export default function MushafPage({
                   {slot.words.map((w) => {
                     const reciting = activeVerse ? w.id.startsWith(activeVerse + ':') : false;
                     if (w.type === 'end') {
-                      return (
+                      const verseKey = w.id.split(':').slice(0, 2).join(':');
+                      const hasTwins = similarVerses?.has(verseKey) ?? false;
+                      const endSpan = (
                         <span key={w.id} className={`ayah-end ${reciting ? 'reciting' : ''}`}>
                           {'۝' + toArabicDigits(w.text)}
+                          {hasTwins && (
+                            <button
+                              className="similar-badge"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSimilarClick?.(verseKey);
+                              }}
+                              title="لهذه الآية متشابهات — انقر للمقارنة"
+                              aria-label="عرض متشابهات الآية"
+                            >
+                              ⚭
+                            </button>
+                          )}
                         </span>
                       );
+                      return endSpan;
                     }
                     const wordMarks = marks?.get(w.id);
                     const last = wordMarks?.[wordMarks.length - 1];
