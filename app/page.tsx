@@ -73,6 +73,9 @@ import { createPortal } from 'react-dom';
 
 const pageCache = new Map<number, PageData>();
 
+// إصدار تعليمات الاستخدام — رفعه عند إضافة ميزة مهمة يُعيد عرض التعليمات مرة واحدة للجميع
+const TOUR_VERSION = '2'; // ٢: إضافة المتشابهات ⚭
+
 async function fetchPage(p: number): Promise<PageData> {
   const cached = pageCache.get(p);
   if (cached) return cached;
@@ -442,7 +445,7 @@ export default function Home() {
     setStudents(st);
 
     // تعليمات الاستخدام تظهر مرة واحدة لمن يفتح التطبيق أول مرة
-    if (localStorage.getItem('rassd:tourSeen') !== '1') setTourOpen(true);
+    if (localStorage.getItem('rassd:tourSeen') !== TOUR_VERSION) setTourOpen(true);
 
     // استرجاع تفعيل المتشابهات من الجلسات السابقة
     if (localStorage.getItem('rassd:similar') === '1') {
@@ -2367,7 +2370,7 @@ export default function Home() {
         <div
           className="export-backdrop"
           onClick={() => {
-            localStorage.setItem('rassd:tourSeen', '1');
+            localStorage.setItem('rassd:tourSeen', TOUR_VERSION);
             setTourOpen(false);
           }}
         >
@@ -2467,7 +2470,7 @@ export default function Home() {
               <button
                 className="nav-btn"
                 onClick={() => {
-                  localStorage.setItem('rassd:tourSeen', '1');
+                  localStorage.setItem('rassd:tourSeen', TOUR_VERSION);
                   setTourOpen(false);
                 }}
               >
