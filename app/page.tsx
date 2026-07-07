@@ -1353,6 +1353,19 @@ export default function Home() {
             </button>
             <button
               className="bar-icon"
+              onClick={() => {
+                setExportFrom(String(page));
+                setExportTo(String(page));
+                setExportErr('');
+                setExportOpen(true);
+              }}
+              title="تصدير PDF"
+              aria-label="تصدير PDF"
+            >
+              📄
+            </button>
+            <button
+              className="bar-icon"
               onClick={() =>
                 setTheme((t) => (t === 'light' ? 'dark' : t === 'dark' ? 'sepia' : 'light'))
               }
