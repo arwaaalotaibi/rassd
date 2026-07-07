@@ -110,6 +110,8 @@ export default function Home() {
   // آية يومض تمييزها بعد الانتقال إليها من البحث
   const [flashVerse, setFlashVerse] = useState<string | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // تعليمات الاستخدام — تظهر تلقائياً في أول زيارة
+  const [tourOpen, setTourOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
@@ -431,6 +433,9 @@ export default function Home() {
 
     const st = loadStudents();
     setStudents(st);
+
+    // تعليمات الاستخدام تظهر مرة واحدة لمن يفتح التطبيق أول مرة
+    if (localStorage.getItem('rassd:tourSeen') !== '1') setTourOpen(true);
 
     // تسجيل عامل الخدمة للعمل بدون إنترنت (PWA)
     if ('serviceWorker' in navigator) {
@@ -2009,6 +2014,15 @@ export default function Home() {
                   👩‍🏫 الحلقة
                 </button>
               )}
+              <button
+                className="sheet-tile"
+                onClick={() => {
+                  setTourOpen(true);
+                  setMoreOpen(false);
+                }}
+              >
+                📘 طريقة الاستخدام
+              </button>
             </div>
 
             <p className="sheet-section">الحساب</p>
@@ -2099,6 +2113,77 @@ export default function Home() {
             </div>
           </div>
         </>
+      )}
+
+      {/* تعليمات الاستخدام — أول زيارة أو من ورقة «المزيد» */}
+      {tourOpen && (
+        <div
+          className="export-backdrop"
+          onClick={() => {
+            localStorage.setItem('rassd:tourSeen', '1');
+            setTourOpen(false);
+          }}
+        >
+          <div className="export-dialog controls tour-dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>👋 أهلاً بك في رصد</h2>
+            <p className="export-hint">
+              مصحف إلكتروني لرصد أخطاء التسميع ومتابعتها — هكذا تستخدمه:
+            </p>
+            <div className="tour-list">
+              <div className="tour-item">
+                <span className="tour-emoji">👆</span>
+                <span>
+                  <b>انقر أي كلمة</b> لرصد خطأ عليها — اختر نوعه فتتلوّن الكلمة،
+                  وتقدر تكتب ملاحظة للطالب.
+                </span>
+              </div>
+              <div className="tour-item">
+                <span className="tour-emoji">👉</span>
+                <span>
+                  <b>اسحب الصفحة</b> يميناً أو يساراً لتقليب الصفحات.
+                </span>
+              </div>
+              <div className="tour-item">
+                <span className="tour-emoji">📖</span>
+                <span>
+                  <b>الشارة العلوية</b> للتنقل بين السور والصفحات، و<b>🔍</b> للبحث
+                  في الآيات بكتابة كلمة منها.
+                </span>
+              </div>
+              <div className="tour-item">
+                <span className="tour-emoji">📅</span>
+                <span>
+                  <b>الشريط السفلي:</b> تاريخ الجلسة، و<b>✍️ أرصد في</b> للتبديل بين
+                  مصحفك ومصاحف طلابك.
+                </span>
+              </div>
+              <div className="tour-item">
+                <span className="tour-emoji">⋯</span>
+                <span>
+                  <b>كل الأدوات</b> تحت زر المزيد: الاستماع والتكرار، الإحصاءات،
+                  تصدير PDF، وربط الأجهزة.
+                </span>
+              </div>
+              <div className="tour-item">
+                <span className="tour-emoji">⛶</span>
+                <span>
+                  <b>قراءة صافية</b> تُخفي كل الأدوات ويبقى المصحف وحده.
+                </span>
+              </div>
+            </div>
+            <div className="export-actions">
+              <button
+                className="nav-btn"
+                onClick={() => {
+                  localStorage.setItem('rassd:tourSeen', '1');
+                  setTourOpen(false);
+                }}
+              >
+                ✨ فهمت — أبدأ
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* نافذة الدعم والملاحظات */}

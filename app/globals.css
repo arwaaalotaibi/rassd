@@ -2435,3 +2435,40 @@ body.focus-lock { overflow: hidden; }
   color: var(--green-deep);
   opacity: 0.85;
 }
+
+/* ═══════════ تعليمات الاستخدام (الجولة الأولى) ═══════════ */
+.tour-dialog {
+  max-width: 420px;
+}
+.tour-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tour-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.8;
+  background: rgba(184, 145, 47, 0.07);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 9px 12px;
+}
+.tour-item b {
+  color: var(--green-deep);
+}
+.tour-emoji {
+  font-size: 20px;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 999px;
+}
