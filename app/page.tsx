@@ -1292,12 +1292,17 @@ export default function Home() {
     }
   };
 
+  // يعيد true إذا كان الرقم صالحاً وتم الانتقال — لإغلاق ورقة التنقل بعده
   const submitPageInput = () => {
     // تطبيع الأرقام العربية قبل التحقق
     const normalized = pageInput.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
     const n = Number(normalized);
-    if (Number.isInteger(n) && n >= 1 && n <= TOTAL_PAGES) go(n);
     setPageInput('');
+    if (Number.isInteger(n) && n >= 1 && n <= TOTAL_PAGES) {
+      go(n);
+      return true;
+    }
+    return false;
   };
 
   return (
@@ -1729,18 +1734,29 @@ export default function Home() {
               <input
                 type="text"
                 inputMode="numeric"
+                enterKeyHint="go"
                 placeholder={`صفحة ١-${toArabicDigits(TOTAL_PAGES)}`}
                 value={pageInput}
                 onChange={(e) => setPageInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    submitPageInput();
-                    setNavOpen(false);
-                  }
+                  if (e.key === 'Enter' && submitPageInput()) setNavOpen(false);
+                }}
+                onBlur={() => {
+                  // إغلاق كيبورد الجوال بعد كتابة الرقم = انتقال مباشر
+                  if (pageInput.trim() && submitPageInput()) setNavOpen(false);
                 }}
                 className="w-28 text-center"
                 aria-label="الانتقال إلى صفحة"
               />
+              <button
+                className="nav-btn"
+                disabled={!pageInput.trim()}
+                onClick={() => {
+                  if (submitPageInput()) setNavOpen(false);
+                }}
+              >
+                اذهب ←
+              </button>
             </div>
             <div className="export-actions">
               <button className="nav-btn" onClick={() => go(page - 1)} disabled={page <= 1}>
