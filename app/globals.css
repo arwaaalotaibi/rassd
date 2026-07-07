@@ -2381,3 +2381,57 @@ body.focus-lock { overflow: hidden; }
   max-height: 88dvh;
   overflow-y: auto;
 }
+
+/* ═══════════ بحث الآيات ═══════════ */
+.search-input {
+  width: 100%;
+  font-size: 16px; /* ≥16px يمنع تكبير iOS التلقائي */
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 11px 14px;
+  outline: none;
+}
+.search-input:focus {
+  border-color: var(--gold);
+}
+.search-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-deep);
+  opacity: 0.8;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: start;
+  background: rgba(184, 145, 47, 0.07);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 10px 13px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.search-result:hover {
+  background: rgba(184, 145, 47, 0.16);
+}
+.search-ayah {
+  font-family: "UthmanicHafs", serif;
+  font-size: 19px;
+  line-height: 1.9;
+  color: var(--ink);
+}
+.search-ref {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--green-deep);
+  opacity: 0.85;
+}

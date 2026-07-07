@@ -87,3 +87,21 @@ export function buildLines(data: PageData): LineSlot[] {
 
   return slots;
 }
+
+// تطبيع النص العربي للبحث: إزالة التشكيل والعلامات القرآنية الصغيرة والتطويل،
+// وتوحيد أشكال الألف والهمزات والياء والتاء المربوطة — يطابق النص الإملائي بلا حركات
+export function normalizeArabic(s: string): string {
+  return s
+    .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED\u0640\u08D3-\u08FF]/g, '')
+    .replace(/[\u0623\u0625\u0622\u0671]/g, '\u0627')
+    .replace(/\u0649/g, '\u064A')
+    .replace(/\u0624/g, '\u0648')
+    .replace(/\u0626/g, '\u064A')
+    .replace(/\u0621/g, '')
+    .replace(/\u0629/g, '\u0647')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// نوع مدخلة فهرس البحث المحمَّل من public/quran/search-index.json
+export type SearchEntry = { k: string; p: number; t: string };

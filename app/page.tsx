@@ -37,9 +37,11 @@ import { computeStats } from '@/lib/stats';
 import {
   TOTAL_PAGES,
   juzOfPage,
+  normalizeArabic,
   toArabicDigits,
   type Chapter,
   type PageData,
+  type SearchEntry,
 } from '@/lib/quran';
 import {
   addTeacherLink,
@@ -99,6 +101,15 @@ export default function Home() {
   const [navOpen, setNavOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  // بحث الآيات
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoaded, setSearchLoaded] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchIndexRef = useRef<(SearchEntry & { n: string })[]>([]);
+  // آية يومض تمييزها بعد الانتقال إليها من البحث
+  const [flashVerse, setFlashVerse] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFrom, setExportFrom] = useState('');
   const [exportTo, setExportTo] = useState('');
@@ -590,6 +601,49 @@ export default function Home() {
     }
   }, []);
 
+  // بحث الآيات: تحميل الفهرس مرة واحدة عند أول فتح، مع تطبيع نص كل آية للمطابقة
+  const openSearch = useCallback(() => {
+    setSearchOpen(true);
+    if (searchLoaded || searchLoading) return;
+    setSearchLoading(true);
+    fetch('/quran/search-index.json')
+      .then((r) => r.json())
+      .then((idx: SearchEntry[]) => {
+        searchIndexRef.current = idx.map((e) => ({ ...e, n: normalizeArabic(e.t) }));
+        setSearchLoaded(true);
+      })
+      .catch(() => {})
+      .finally(() => setSearchLoading(false));
+  }, [searchLoaded, searchLoading]);
+
+  // نتائج البحث: كل كلمة مكتوبة يجب أن ترد في الآية (مطابقة مرنة لا تتقيّد بالترتيب)
+  const searchResults = useMemo(() => {
+    const tokens = normalizeArabic(searchQuery).split(' ').filter((t) => t.length);
+    if (tokens.join('').length < 2 || !searchLoaded) {
+      return [] as (SearchEntry & { n: string })[];
+    }
+    const out: (SearchEntry & { n: string })[] = [];
+    for (const e of searchIndexRef.current) {
+      if (tokens.every((t) => e.n.includes(t))) {
+        out.push(e);
+        if (out.length >= 50) break;
+      }
+    }
+    return out;
+  }, [searchQuery, searchLoaded]);
+
+  // الانتقال إلى آية من نتائج البحث مع وميض تمييزها على الصفحة
+  const jumpToVerse = useCallback(
+    (entry: SearchEntry) => {
+      go(entry.p);
+      setSearchOpen(false);
+      setFlashVerse(entry.k);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlashVerse(null), 4500);
+    },
+    [go]
+  );
+
   // تطبيق سمة القراءة وحفظها (فاتح / ليلي / دافئ)
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -671,6 +725,7 @@ export default function Home() {
         setMoreOpen(false);
         setProfileOpen(false);
         setLayersOpen(false);
+        setSearchOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1280,6 +1335,14 @@ export default function Home() {
           <div className="top-actions">
             <button
               className="bar-icon"
+              onClick={openSearch}
+              title="بحث في الآيات"
+              aria-label="بحث في الآيات"
+            >
+              🔍
+            </button>
+            <button
+              className="bar-icon"
               onClick={() =>
                 setTheme((t) => (t === 'light' ? 'dark' : t === 'dark' ? 'sepia' : 'light'))
               }
@@ -1428,7 +1491,7 @@ export default function Home() {
               chapters={chapterMap}
               marks={pageMarks}
               onWordClick={onWordClick}
-              activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : null}
+              activeVerse={hifzStatus ? `${hifzSurah}:${hifzStatus.ayah}` : flashVerse}
             />
           </div>
         ) : (
@@ -1692,6 +1755,66 @@ export default function Home() {
             <p className="export-hint dim-hint">
               💡 اسحب صفحة المصحف يميناً أو يساراً لتقليب الصفحات مباشرة.
             </p>
+          </div>
+        </>
+      )}
+
+      {/* ورقة بحث الآيات */}
+      {searchOpen && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setSearchOpen(false)} />
+          <div className="sheet controls search-sheet" role="dialog" aria-label="بحث في الآيات">
+            <div className="sheet-handle" />
+            <h3 className="sheet-title">🔍 بحث في الآيات</h3>
+            <input
+              type="search"
+              className="search-input"
+              placeholder="اكتب كلمة أو جزء آية…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+              dir="rtl"
+              aria-label="نص البحث"
+            />
+            {searchLoading && <p className="export-hint">⏳ يحمّل فهرس البحث…</p>}
+            {searchLoaded && normalizeArabic(searchQuery).replace(/ /g, '').length >= 2 && (
+              <p className="search-count">
+                {searchResults.length === 0
+                  ? '🚫 لا توجد نتائج مطابقة'
+                  : `${toArabicDigits(searchResults.length)}${
+                      searchResults.length >= 50 ? '+' : ''
+                    } نتيجة`}
+              </p>
+            )}
+            {searchLoaded && normalizeArabic(searchQuery).replace(/ /g, '').length < 2 && (
+              <p className="export-hint dim-hint">
+                💡 اكتب كلمة (بلا حركات) وستظهر كل الآيات التي وردت فيها — انقر أيّها
+                للانتقال إليه.
+              </p>
+            )}
+            <div className="search-results">
+              {searchResults.map((e) => {
+                const [s, a] = e.k.split(':');
+                return (
+                  <button
+                    key={e.k}
+                    className="search-result"
+                    onClick={() => jumpToVerse(e)}
+                  >
+                    <span className="search-ayah">{e.t}</span>
+                    <span className="search-ref">
+                      {chapterMap.get(Number(s))?.name ?? s} · آية {toArabicDigits(a)} · ص
+                      {toArabicDigits(e.p)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="export-actions">
+              <button className="cancel-btn" onClick={() => setSearchOpen(false)}>
+                إغلاق
+              </button>
+            </div>
           </div>
         </>
       )}
