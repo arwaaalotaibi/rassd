@@ -2540,3 +2540,35 @@ body.focus-lock { overflow: hidden; }
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* ═══════════ سرعة التلاوة ═══════════ */
+.rate-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.rate-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-deep);
+}
+.rate-btn {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--green-deep);
+  background: var(--paper);
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 999px;
+  padding: 4px 13px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.rate-btn:hover {
+  background: rgba(184, 145, 47, 0.14);
+}
+.rate-btn.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fdfaf1;
+}

@@ -221,6 +221,9 @@ export default function Home() {
   const hifzStopRef = useRef(true);
   const pageRef = useRef(1);
   const [reciter, setReciter] = useState(DEFAULT_RECITER);
+  // سرعة التلاوة — تنطبق على كل السماع (الآية، المكرِّر، المتشابهات) وتُحفظ
+  const [playRate, setPlayRate] = useState(1);
+  const playRateRef = useRef(1);
   // راحة القراءة: السمة، حجم الخط، وضع التركيز، وحركة انزلاق الصفحة
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>('light');
   const [fontScale, setFontScale] = useState(1);
@@ -420,6 +423,11 @@ export default function Home() {
     const saved = Number(localStorage.getItem('rassd:page'));
     if (saved >= 1 && saved <= TOTAL_PAGES) setPage(saved);
     setReciter(loadReciter());
+    const savedRate = Number(localStorage.getItem('rassd:playRate'));
+    if ([0.75, 1, 1.25, 1.5, 2].includes(savedRate)) {
+      setPlayRate(savedRate);
+      playRateRef.current = savedRate;
+    }
     const savedTheme = localStorage.getItem('rassd:theme');
     if (savedTheme === 'dark' || savedTheme === 'sepia' || savedTheme === 'light') {
       setTheme(savedTheme);
@@ -696,6 +704,14 @@ export default function Home() {
     [go]
   );
 
+  // تغيير سرعة التلاوة: يُحفظ ويسري فوراً حتى على الصوت الجاري
+  const changeRate = useCallback((r: number) => {
+    setPlayRate(r);
+    playRateRef.current = r;
+    localStorage.setItem('rassd:playRate', String(r));
+    if (audioRef.current) audioRef.current.playbackRate = r;
+  }, []);
+
   // سماع آيتين متشابهتين تباعاً — الأولى ثم شبيهتها مباشرة (للتثبيت بالسمع)
   const playTwoAyahs = useCallback(
     (first: string, second: string) => {
@@ -710,11 +726,13 @@ export default function Home() {
       const [s2, a2] = second.split(':').map(Number);
       audioRef.current?.pause();
       const audio1 = new Audio(ayahAudioUrl(reciter, s1, a1));
+      audio1.playbackRate = playRateRef.current;
       audioRef.current = audio1;
       setPlayingAyah(first);
       const stop = () => setPlayingAyah(null);
       audio1.onended = () => {
         const audio2 = new Audio(ayahAudioUrl(reciter, s2, a2));
+        audio2.playbackRate = playRateRef.current;
         audioRef.current = audio2;
         setPlayingAyah(second);
         audio2.onended = stop;
@@ -1332,6 +1350,7 @@ export default function Home() {
           await new Promise<void>((resolve) => {
             audioRef.current?.pause();
             const audio = new Audio(ayahAudioUrl(reciter, hifzSurah, a));
+            audio.playbackRate = playRateRef.current;
             audioRef.current = audio;
             audio.onended = () => resolve();
             audio.onerror = () => resolve();
@@ -1356,6 +1375,7 @@ export default function Home() {
       }
       audioRef.current?.pause();
       const audio = new Audio(ayahAudioUrl(reciter, surah, ayah));
+      audio.playbackRate = playRateRef.current;
       audioRef.current = audio;
       setPlayingAyah(key);
       audio.onended = () => setPlayingAyah(null);
@@ -2436,10 +2456,10 @@ export default function Home() {
               <div className="tour-item">
                 <span className="tour-emoji">🎧</span>
                 <span>
-                  <b>الاستماع والحفظ:</b> اختر القارئ والسورة ونطاق الآيات، وحدّد
-                  تكرار كل آية (حتى ٥٠ مرة) وإعادة المقطع كاملاً أو بلا توقف —
-                  التلاوة تعمل على المصحف نفسه والصفحة تنقلب تلقائياً إلى موضع
-                  الآية المتلوّة.
+                  <b>الاستماع والحفظ:</b> اختر القارئ و<b>سرعة التلاوة</b> (من ٠٫٧٥×
+                  إلى ٢×) والسورة ونطاق الآيات، وحدّد تكرار كل آية (حتى ٥٠ مرة)
+                  وإعادة المقطع كاملاً أو بلا توقف — التلاوة تعمل على المصحف نفسه
+                  والصفحة تنقلب تلقائياً إلى موضع الآية المتلوّة.
                 </span>
               </div>
               <div className="tour-item">
@@ -2554,6 +2574,16 @@ export default function Home() {
                 ? ` · الإعادة ${toArabicDigits(hifzStatus.round)}/${toArabicDigits(Number(hifzRounds))}`
                 : ''}
           </span>
+          <button
+            className="hifz-bar-stop"
+            onClick={() => {
+              const rates = [0.75, 1, 1.25, 1.5, 2];
+              changeRate(rates[(rates.indexOf(playRate) + 1) % rates.length]);
+            }}
+            title="تغيير سرعة التلاوة"
+          >
+            ⏩ {toArabicDigits(String(playRate).replace('.', '٫'))}×
+          </button>
           <button className="hifz-bar-stop" onClick={stopHifz}>
             ⏹ إيقاف
           </button>
@@ -2776,6 +2806,18 @@ export default function Home() {
                 ))}
               </select>
             </label>
+            <div className="rate-row" role="group" aria-label="سرعة التلاوة">
+              <span className="rate-label">⏩ السرعة:</span>
+              {[0.75, 1, 1.25, 1.5, 2].map((r) => (
+                <button
+                  key={r}
+                  className={`rate-btn ${playRate === r ? 'active' : ''}`}
+                  onClick={() => changeRate(r)}
+                >
+                  {toArabicDigits(String(r).replace('.', '٫'))}×
+                </button>
+              ))}
+            </div>
             <label className="sync-code-label">
               السورة:
               <select
