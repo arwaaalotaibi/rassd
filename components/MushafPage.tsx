@@ -117,8 +117,12 @@ export default function MushafPage({
             })}
           </div>
 
+          {/* وجه الصفحة في المصحف الورقي: الفردية يمين والزوجية يسار (الفاتحة ص١ = يمين) */}
           <div className="page-number">
-            <span>{toArabicDigits(data.page)}</span>
+            <span>
+              {toArabicDigits(data.page)}
+              <em className="page-side">· {data.page % 2 === 1 ? 'وجه أيمن' : 'وجه أيسر'}</em>
+            </span>
           </div>
         </div>
       </div>

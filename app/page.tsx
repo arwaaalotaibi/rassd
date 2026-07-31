@@ -1695,7 +1695,9 @@ export default function Home() {
             >
               ✕
             </button>
-            <div className="focus-page">{toArabicDigits(page)}</div>
+            <div className="focus-page">
+              {toArabicDigits(page)} · {page % 2 === 1 ? 'وجه أيمن' : 'وجه أيسر'}
+            </div>
           </>
         )}
 
