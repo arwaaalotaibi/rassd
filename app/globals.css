@@ -2677,3 +2677,35 @@ body.focus-lock { overflow: hidden; }
   background: var(--green);
   border-color: var(--green);
 }
+
+/* ═══════════ طباعة نتائج البحث ═══════════ */
+.search-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.print-search-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+.print-search-row {
+  border: 1.5px solid var(--gold-soft);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.print-search-ayah {
+  font-family: "UthmanicHafs", serif;
+  font-size: 21px;
+  line-height: 2;
+  color: var(--ink);
+}
+.print-search-ref {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--green-deep);
+  opacity: 0.85;
+  margin-top: 6px;
+}

@@ -157,6 +157,12 @@ export default function Home() {
   const [errorFilter, setErrorFilter] = useState<ErrorType | 'all'>('all');
   const [listPrint, setListPrint] = useState<ListEntry[][] | null>(null);
   const [listBusy, setListBusy] = useState('');
+  // طباعة نتائج البحث: قائمة الآيات المطابقة تُصدَّر PDF
+  const [searchPrint, setSearchPrint] = useState<{
+    query: string;
+    chunks: (SearchEntry & { n: string })[][];
+  } | null>(null);
+  const [searchBusy, setSearchBusy] = useState('');
   const [importCode, setImportCode] = useState('');
   const [importMsg, setImportMsg] = useState('');
   const [importBusy, setImportBusy] = useState(false);
@@ -1077,6 +1083,58 @@ export default function Home() {
     }
     setListBusy('');
     setListPrint(null);
+  };
+
+  // تصدير نتائج البحث PDF: نفس خط أنابيب التصوير (يعمل على الجوال أيضاً)
+  const doSearchExport = async () => {
+    if (searchResults.length === 0) return;
+    setSearchBusy('يجهّز القائمة…');
+    const query = searchQuery.trim();
+    try {
+      const PER_PAGE = 8;
+      const chunks: (SearchEntry & { n: string })[][] = [];
+      for (let i = 0; i < searchResults.length; i += PER_PAGE) {
+        chunks.push(searchResults.slice(i, i + PER_PAGE));
+      }
+      setSearchPrint({ query, chunks });
+      await document.fonts.ready;
+      for (let tries = 0; tries < 60; tries++) {
+        if (document.querySelectorAll('.print-page').length >= chunks.length) break;
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      await new Promise((r) => setTimeout(r, 150));
+
+      const [{ toCanvas }, { jsPDF }] = await Promise.all([
+        import('html-to-image'),
+        import('jspdf'),
+      ]);
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>('.print-page'));
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+      const MARGIN = 8;
+      for (let i = 0; i < nodes.length; i++) {
+        setSearchBusy(`يصوّر (${toArabicDigits(i + 1)}/${toArabicDigits(nodes.length)})…`);
+        const canvas = await toCanvas(nodes[i], { pixelRatio: 2, backgroundColor: '#ffffff' });
+        const ratio = canvas.width / canvas.height;
+        const maxW = 210 - MARGIN * 2;
+        let w = maxW;
+        let h = w / ratio;
+        const maxH = 297 - MARGIN * 2;
+        if (h > maxH) {
+          h = maxH;
+          w = h * ratio;
+        }
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (210 - w) / 2, MARGIN, w, h);
+      }
+      pdf.save('rassd-search.pdf');
+    } catch {
+      setSearchBusy('');
+      setSearchPrint(null);
+      alert('تعذّر إنشاء الملف — جرّب مرة أخرى');
+      return;
+    }
+    setSearchBusy('');
+    setSearchPrint(null);
   };
 
   // بطاقة تقرير الأسبوع: صورة أنيقة تُشارك واتساب (آخر ٧ أيام مقارنةً بالسبعة قبلها)
@@ -2055,13 +2113,20 @@ export default function Home() {
             />
             {searchLoading && <p className="export-hint">⏳ يحمّل فهرس البحث…</p>}
             {searchLoaded && normalizeArabic(searchQuery).replace(/ /g, '').length >= 2 && (
-              <p className="search-count">
-                {searchResults.length === 0
-                  ? '🚫 لا توجد نتائج مطابقة'
-                  : `${toArabicDigits(searchResults.length)}${
-                      searchResults.length >= 50 ? '+' : ''
-                    } نتيجة`}
-              </p>
+              <div className="search-count-row">
+                <p className="search-count">
+                  {searchResults.length === 0
+                    ? '🚫 لا توجد نتائج مطابقة'
+                    : `${toArabicDigits(searchResults.length)}${
+                        searchResults.length >= 50 ? '+' : ''
+                      } نتيجة`}
+                </p>
+                {searchResults.length > 0 && (
+                  <button className="jump-btn" disabled={!!searchBusy} onClick={doSearchExport}>
+                    {searchBusy || '🖨️ حفظ القائمة PDF'}
+                  </button>
+                )}
+              </div>
             )}
             {searchLoaded && normalizeArabic(searchQuery).replace(/ /g, '').length < 2 && (
               <p className="export-hint dim-hint">
@@ -3576,6 +3641,39 @@ export default function Home() {
                 <span>rassd.vercel.app</span>
               </div>
             </div>
+          </div>,
+          document.body
+        )}
+
+      {/* حاوية طباعة نتائج البحث */}
+      {searchPrint &&
+        createPortal(
+          <div className="print-root">
+            {searchPrint.chunks.map((chunk, ci) => (
+              <div key={ci} className="print-page">
+                <div className="print-head">
+                  <span>📖 رصد — نتائج البحث عن «{searchPrint.query}»</span>
+                  <span>{formatArabicDate(todayISO())}</span>
+                </div>
+                <div className="print-search-rows">
+                  {chunk.map((e) => {
+                    const [s, a] = e.k.split(':');
+                    return (
+                      <div key={e.k} className="print-search-row">
+                        <p className="print-search-ayah">{e.t}</p>
+                        <p className="print-search-ref">
+                          سورة {chapterMap.get(Number(s))?.name ?? s} — آية {toArabicDigits(a)}
+                          {' · '}صفحة {toArabicDigits(e.p)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="print-page-footer">
+                  {toArabicDigits(ci + 1)} / {toArabicDigits(searchPrint.chunks.length)}
+                </div>
+              </div>
+            ))}
           </div>,
           document.body
         )}
