@@ -35,8 +35,11 @@ export default function MushafPage({
   const firstChapter = data.verses[0]?.chapter;
   const surahName = firstChapter ? chapters.get(firstChapter)?.name ?? '' : '';
 
+  // وجه الصفحة في المصحف الورقي: الفردية يمين (كعبها يسار) والزوجية يسار (كعبها يمين)
+  const side = data.page % 2 === 1 ? 'side-right' : 'side-left';
+
   return (
-    <div className="mushaf-frame w-full">
+    <div className={`mushaf-frame w-full ${side}`}>
       <div className="mushaf-frame-inner">
         <div className={`mushaf-page ${ornate ? 'ornate' : ''}`} style={{ aspectRatio: '0.68' }}>
           <div className="page-meta">
