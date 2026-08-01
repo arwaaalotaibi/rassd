@@ -2642,28 +2642,16 @@ body.focus-lock { overflow: hidden; }
   box-shadow: -2.5px 2.5px 6px rgba(33, 48, 31, 0.3);
 }
 
-/* الكعب المصقول: ظل انحناء يتبعه خيط ضوء (تقوّس الورقة عند التجليد) */
+/* الكعب: ظل انحناء هادئ يتلاشى نحو الصفحة (بلا خط ضوء) */
 .side-right .mushaf-page::after {
   left: 0;
-  width: 34px;
-  background: linear-gradient(
-    to right,
-    rgba(33, 48, 31, 0.16),
-    rgba(33, 48, 31, 0.05) 42%,
-    rgba(255, 255, 255, 0.4) 58%,
-    transparent 80%
-  );
+  width: 26px;
+  background: linear-gradient(to right, rgba(33, 48, 31, 0.13), transparent);
 }
 .side-left .mushaf-page::after {
   right: 0;
-  width: 34px;
-  background: linear-gradient(
-    to left,
-    rgba(33, 48, 31, 0.16),
-    rgba(33, 48, 31, 0.05) 42%,
-    rgba(255, 255, 255, 0.4) 58%,
-    transparent 80%
-  );
+  width: 26px;
+  background: linear-gradient(to left, rgba(33, 48, 31, 0.13), transparent);
 }
 
 /* أيقونة الوجهين وسط الترويسة: الوجه النشط معبّأ — تُقرأ بلا كلمات */
