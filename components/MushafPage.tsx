@@ -3,6 +3,7 @@
 import { ERROR_TYPES, type ErrorMark } from '@/lib/errors';
 import {
   BASMALA,
+  TOTAL_PAGES,
   buildLines,
   juzOfPage,
   toArabicDigits,
@@ -36,14 +37,33 @@ export default function MushafPage({
   const surahName = firstChapter ? chapters.get(firstChapter)?.name ?? '' : '';
 
   // وجه الصفحة في المصحف الورقي: الفردية يمين (كعبها يسار) والزوجية يسار (كعبها يمين)
-  const side = data.page % 2 === 1 ? 'side-right' : 'side-left';
+  const isRight = data.page % 2 === 1;
+  const side = isRight ? 'side-right' : 'side-left';
+  // سماكة الأوراق على الحافة الخارجية — معلومة حقيقية لا زخرفة:
+  // تحت الوجه الأيمن ما قرأتَه، وتحت الأيسر ما بقي (كالكتاب المفتوح تماماً)
+  const frac = isRight
+    ? (data.page - 1) / (TOTAL_PAGES - 1)
+    : (TOTAL_PAGES - data.page) / (TOTAL_PAGES - 1);
+  const stack = Math.round(2 + 10 * frac);
 
   return (
-    <div className={`mushaf-frame w-full ${side}`}>
+    <div
+      className={`mushaf-frame w-full ${side}`}
+      style={{ '--stack': `${stack}px` } as CSSProperties}
+    >
       <div className="mushaf-frame-inner">
         <div className={`mushaf-page ${ornate ? 'ornate' : ''}`} style={{ aspectRatio: '0.68' }}>
           <div className="page-meta">
             <span>سورة {surahName}</span>
+            <span
+              className="page-spread"
+              role="img"
+              aria-label={isRight ? 'وجه أيمن' : 'وجه أيسر'}
+              title={isRight ? 'هذه الصفحة وجه أيمن في المصحف' : 'هذه الصفحة وجه أيسر في المصحف'}
+            >
+              <i className={isRight ? 'on' : ''} />
+              <i className={!isRight ? 'on' : ''} />
+            </span>
             <span>الجزء {toArabicDigits(juzOfPage(data.page))}</span>
           </div>
 

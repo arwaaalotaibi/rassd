@@ -2611,3 +2611,81 @@ body.focus-lock { overflow: hidden; }
   right: 0;
   background: linear-gradient(to left, rgba(33, 48, 31, 0.11), transparent);
 }
+
+/* ═══════════ استعارة الكتاب الكاملة: أوراق + كعب + أيقونة الوجهين ═══════════ */
+.mushaf-frame { position: relative; }
+
+/* سماكة الأوراق على الحافة الخارجية — تحت الأيمن ما قُرئ وتحت الأيسر ما بقي */
+.mushaf-frame::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  width: var(--stack, 4px);
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    var(--stack-dir, to right),
+    #f2ead6 0 1.4px,
+    #cdbb8d 1.4px 2.8px
+  );
+}
+.mushaf-frame.side-right::before {
+  right: calc(-1 * var(--stack, 4px));
+  --stack-dir: to right;
+  border-radius: 0 5px 5px 0;
+  box-shadow: 2.5px 2.5px 6px rgba(33, 48, 31, 0.3);
+}
+.mushaf-frame.side-left::before {
+  left: calc(-1 * var(--stack, 4px));
+  --stack-dir: to left;
+  border-radius: 5px 0 0 5px;
+  box-shadow: -2.5px 2.5px 6px rgba(33, 48, 31, 0.3);
+}
+
+/* الكعب المصقول: ظل انحناء يتبعه خيط ضوء (تقوّس الورقة عند التجليد) */
+.side-right .mushaf-page::after {
+  left: 0;
+  width: 34px;
+  background: linear-gradient(
+    to right,
+    rgba(33, 48, 31, 0.16),
+    rgba(33, 48, 31, 0.05) 42%,
+    rgba(255, 255, 255, 0.4) 58%,
+    transparent 80%
+  );
+}
+.side-left .mushaf-page::after {
+  right: 0;
+  width: 34px;
+  background: linear-gradient(
+    to left,
+    rgba(33, 48, 31, 0.16),
+    rgba(33, 48, 31, 0.05) 42%,
+    rgba(255, 255, 255, 0.4) 58%,
+    transparent 80%
+  );
+}
+
+/* أيقونة الوجهين وسط الترويسة: الوجه النشط معبّأ — تُقرأ بلا كلمات */
+.page-spread {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.page-spread i {
+  display: block;
+  width: 0.8em;
+  height: 1.05em;
+  border: 1px solid var(--gold);
+  background: transparent;
+}
+.page-spread i:first-child {
+  border-radius: 1px 4px 4px 1px;
+}
+.page-spread i:last-child {
+  border-radius: 4px 1px 1px 4px;
+}
+.page-spread i.on {
+  background: var(--green);
+  border-color: var(--green);
+}
